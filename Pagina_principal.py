@@ -7,7 +7,7 @@ import importlib.util, sys
 
 st.set_page_config(page_title="Simulación Bursátil", layout="wide")
 
-# ================== BASE DE DATOS (Jugadores) ==================
+# BASE DE DATOS 
 conn = sqlite3.connect("jugadores.db")
 c = conn.cursor()
 c.execute('''
@@ -19,14 +19,14 @@ c.execute('''
 ''')
 conn.commit()
 
-# ================== PERFILES ==================
+#  PERFILES 
 passwords = {
     "4539": "Conservador", "6758": "Conservador",
     "8795": "Moderado", "7906": "Moderado",
     "1357": "Arriesgado", "8745": "Arriesgado"
 }
 
-# ================== LOGIN ==================
+# LOGIN 
 def login_screen():
     st.title("Ingreso a la Simulación")
     username = st.text_input("Nombre del grupo")
@@ -48,23 +48,22 @@ def login_screen():
         else:
             st.error("Contraseña incorrecta")
 
-# ================== ESTADO DE SESIÓN ==================
+# ESTADO DE SESIÓN 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "home"
 
-# ---------------------------
 # Aplicar estilos para ocultar el navegador automático de Streamlit
 # (esto hace que la lista lateral/top-right NO aparezca en la pantalla de login)
 # ---------------------------
 util.aplicar_estilos(hide_streamlit_nav=True)
 
-# ================== FLUJO PRINCIPAL ==================
+#FLUJO PRINCIPAL 
 if not st.session_state["logged_in"]:
     login_screen()
 else:
-    # Mostrar tu menú horizontal personalizado (sigue funcionando)
+    # Mostrarmenú horizontal personalizado 
     util.generarMenu_horizontal()
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -74,7 +73,7 @@ else:
         st.subheader("Crea tu propio portafolio de manera inteligente")
         st.write("Visualiza y analiza datos históricos de acciones de más de 400 empresas.")
 
-        # Imagen desde GitHub RAW (HTML para evitar errores con st.image)
+        # Imagen desde GitHub RAW 
         img_url = "https://raw.githubusercontent.com/sebastianllano99/Portafolio/ef70520d06116183958a87132ba1056d95287779/IMG_2734.PNG"
         st.markdown(
             f"""
@@ -101,6 +100,7 @@ else:
             pagina = importlib.util.module_from_spec(spec)
             sys.modules["pagina"] = pagina
             spec.loader.exec_module(pagina)
+
 
 
 
