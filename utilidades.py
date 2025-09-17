@@ -52,11 +52,12 @@ def generarMenu_horizontal():
         if st.button("Inicio"):
             st.session_state["current_page"] = "home"
     with cols[1]:
-        if st.button("Página A"):
+        if st.button("Información"):
             st.session_state["current_page"] = "pagina_a"
     with cols[2]:
-        if st.button("Página B"):
+        if st.button("Mi Portafolio"):
             st.session_state["current_page"] = "pagina_b"
     with cols[3]:
-        if st.button("Página C"):
+        if st.button("Optimización"):
             st.session_state["current_page"] = "pagina_c"
+
