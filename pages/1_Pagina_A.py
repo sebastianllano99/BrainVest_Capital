@@ -6,9 +6,6 @@ import plotly.graph_objects as go
 import gdown
 import zipfile
 
-# --- Configuración de página ---
-# st.set_page_config(page_title="Históricos Bursátiles", layout="wide")
-
 # --- ID del ZIP en Google Drive ---
 ZIP_FILE_ID = "19R9zQNq5vmNuP3l2BMvN0V7rmNvegGas"
 CARPETA_DATOS = "acciones"
@@ -21,26 +18,31 @@ def download_and_unzip():
     gdown.download(url, ZIP_NAME, quiet=False)
     with zipfile.ZipFile(ZIP_NAME, "r") as zf:
         zf.extractall(CARPETA_DATOS)
-    # opcional: borrar el zip
-    # os.remove(ZIP_NAME)
+    # os.remove(ZIP_NAME)  # opcional
 
 # --- Preparar datos ---
 if not os.path.exists(CARPETA_DATOS) or len(os.listdir(CARPETA_DATOS)) == 0:
     download_and_unzip()
 
-archivos = [f for f in os.listdir(CARPETA_DATOS) if f.endswith(".csv")]
+# Buscar CSV en toda la carpeta (aunque haya subcarpetas)
+archivos = []
+for root, _, files in os.walk(CARPETA_DATOS):
+    for f in files:
+        if f.endswith(".csv"):
+            archivos.append(os.path.join(root, f))
+
 if not archivos:
     st.error("No se encontraron archivos CSV en la carpeta.")
     st.stop()
 
 # Renombrar archivos (ej: "EC_2023.csv" -> "EC")
-tickers = {f.split("_")[0]: f for f in archivos}
+tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 
 # --- Selección de ticker ---
 st.title("📈 Visualización de Históricos de Empresas")
 ticker = st.selectbox("Seleccione una empresa:", list(tickers.keys()))
 
-ruta = os.path.join(CARPETA_DATOS, tickers[ticker])
+ruta = tickers[ticker]
 df = pd.read_csv(ruta)
 
 # --- Formateo de datos ---
@@ -56,7 +58,7 @@ df["Cumulative Return"] = (1 + df["Return"] / 100).cumprod() - 1
 st.subheader(f"📋 Datos históricos - {ticker}")
 st.dataframe(df, use_container_width=True, height=400)
 
-# --- Estilo oscuro ---
+# --- Colores y estilos ---
 fondo = "#0d1b2a"
 texto = "#e0e1dd"
 verde = "#00ff7f"
@@ -180,3 +182,5 @@ fig_ret.update_layout(
     )
 )
 st.plotly_chart(fig_ret, use_container_width=True)
+
+
