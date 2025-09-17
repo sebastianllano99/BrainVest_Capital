@@ -42,8 +42,8 @@ if not archivos:
 tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 
 # Selección de ticker 
-st.title(" Visualización de Históricos de Empresas")
-ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys()))
+st.title(" Visualización de Históricos de Empresas") #incorporar emoticonos
+ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys())) #incorporar emoticonos
 
 ruta = tickers[ticker]
 df = pd.read_csv(ruta)
@@ -58,7 +58,7 @@ if "Return" not in df.columns:
 df["Cumulative Return"] = (1 + df["Return"] / 100).cumprod() - 1
 
 #Tabla 
-st.subheader(f" Datos históricos - {ticker}")
+st.subheader(f" Datos históricos - {ticker}") #incorporar emoticonos
 st.dataframe(df, use_container_width=True, height=400)
 
 #Colores y estilos
@@ -92,7 +92,7 @@ st.subheader(" Evolución del Precio Ajustado (Adj Close)") #incorporar emoticon
 
 fig_price = px.line(
     df, x="Date", y="Adj Close",
-    title=f"Evolución histórica de {ticker}",
+    title=f"Evolución histórica de {ticker}", #incorporar emoticonos
     labels={"Date": "Fecha", "Adj Close": "Precio Ajustado"},
     template="plotly_dark"
 )
@@ -115,14 +115,14 @@ st.subheader(" Volumen de Transacciones") #incorporar emoticonos
 opcion_vol = st.selectbox("Frecuencia del volumen", ["Diario", "Semanal", "Mensual"])
 df_vol = df.copy()
 
-if opcion_vol == "Semanal":
+if opcion_vol == "Semanal": #incorporar emoticonos
     df_vol = df.resample("W", on="Date")["Volume"].sum().reset_index()
-elif opcion_vol == "Mensual":
+elif opcion_vol == "Mensual": #incorporar emoticonos
     df_vol = df.resample("M", on="Date")["Volume"].sum().reset_index()
 
 fig_vol = px.line(
     df_vol, x="Date", y="Volume",
-    title=f"Volumen de transacciones ({opcion_vol}) - {ticker}",
+    title=f"Volumen de transacciones ({opcion_vol}) - {ticker}", #incorporar emoticonos
     labels={"Date": "Fecha", "Volume": "Acciones Negociadas"},
     template="plotly_dark"
 )
@@ -145,11 +145,11 @@ st.subheader("Retornos de la Acción") #incorporar emoticonos
 opcion_ret = st.selectbox("Frecuencia de retornos", ["Diario", "Semanal", "Mensual"])
 df_ret = df.copy()
 
-if opcion_ret == "Semanal":
+if opcion_ret == "Semanal": #incorporar emoticonos
     df_ret = df.resample("W", on="Date").agg(
         {"Return": "mean", "Cumulative Return": "last"}
     ).reset_index()
-elif opcion_ret == "Mensual":
+elif opcion_ret == "Mensual": #incorporar emoticonos
     df_ret = df.resample("M", on="Date").agg(
         {"Return": "mean", "Cumulative Return": "last"}
     ).reset_index()
@@ -185,6 +185,7 @@ fig_ret.update_layout(
     )
 )
 st.plotly_chart(fig_ret, use_container_width=True)
+
 
 
 
