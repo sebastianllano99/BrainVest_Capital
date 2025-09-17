@@ -71,8 +71,8 @@ else:
 
     if st.session_state["current_page"] == "home":
         st.title("BrainVest Capital")
-        st.subheader("Crea tu portafolio de manera inteligente")
-        st.write("Visualiza y analiza datos históricos de empresas.")
+        st.subheader("Crea tu propio portafolio de manera inteligente")
+        st.write("Visualiza y analiza datos históricos de acciones de más de 400 empresas.")
 
         # Imagen desde GitHub RAW (HTML para evitar errores con st.image)
         img_url = "https://raw.githubusercontent.com/sebastianllano99/Portafolio/ef70520d06116183958a87132ba1056d95287779/IMG_2734.PNG"
@@ -101,6 +101,7 @@ else:
             pagina = importlib.util.module_from_spec(spec)
             sys.modules["pagina"] = pagina
             spec.loader.exec_module(pagina)
+
 
 
 
