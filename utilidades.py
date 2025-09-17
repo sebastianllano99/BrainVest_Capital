@@ -1,17 +1,26 @@
 # utilidades.py
 import streamlit as st
 
-def aplicar_estilos():
-    st.markdown(
-        """
-        <style>
-        section[data-testid="stSidebarNav"] {display: none !important;}
-        div[data-testid="stSidebarNav"] {display: none !important;}
-        .css-1d391kg { padding-top: 10px; }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+def aplicar_estilos(hide_streamlit_nav=True):
+    """
+    Aplica estilos globales. Si hide_streamlit_nav=True, oculta el navegador
+    automático de páginas que Streamlit genera (sidebar / toolbar).
+    """
+    css = """
+    <style>
+    /* Oculta el navegador lateral automático (cuando existe la carpeta pages/) */
+    section[data-testid="stSidebarNav"], div[data-testid="stSidebarNav"] { display: none !important; }
+
+    /* Oculta la toolbar / botón de páginas (top-right) si existe */
+    div[data-testid="stToolbar"], header[data-testid="stHeader"], button[data-testid="stToolbarButton"], button[aria-label="Toggle navigation"] { display: none !important; }
+
+    /* Ajustes visuales pequeños que ya tenías */
+    .css-1d391kg { padding-top: 10px; }
+    </style>
+    """
+    if hide_streamlit_nav:
+        st.markdown(css, unsafe_allow_html=True)
+
 
 def generarMenu_horizontal():
     st.markdown(
@@ -40,10 +49,14 @@ def generarMenu_horizontal():
 
     cols = st.columns(4)
     with cols[0]:
-        if st.button("Inicio"): st.session_state["current_page"] = "home"
+        if st.button("Inicio"):
+            st.session_state["current_page"] = "home"
     with cols[1]:
-        if st.button("Página A"): st.session_state["current_page"] = "pagina_a"
+        if st.button("Página A"):
+            st.session_state["current_page"] = "pagina_a"
     with cols[2]:
-        if st.button("Página B"): st.session_state["current_page"] = "pagina_b"
+        if st.button("Página B"):
+            st.session_state["current_page"] = "pagina_b"
     with cols[3]:
-        if st.button("Página C"): st.session_state["current_page"] = "pagina_c"
+        if st.button("Página C"):
+            st.session_state["current_page"] = "pagina_c"
