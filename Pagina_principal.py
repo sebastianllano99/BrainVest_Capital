@@ -1,4 +1,5 @@
 import streamlit as st
+from PIL import Image
 import os
 import sqlite3
 import utilidades as util
@@ -67,9 +68,16 @@ else:
         st.subheader("Crea tu portafolio de manera inteligente")
         st.write("Visualiza y analiza datos históricos de empresas.")
 
-        # Usar enlace RAW de GitHub para mostrar la imagen
+        # Imagen desde GitHub RAW (HTML para evitar errores con st.image)
         img_url = "https://raw.githubusercontent.com/sebastianllano99/Portafolio/ef70520d06116183958a87132ba1056d95287779/IMG_2734.PNG"
-        st.image(img_url, use_container_width=True)
+        st.markdown(
+            f"""
+            <div style="text-align: center;">
+                <img src="{img_url}" width="100%" />
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     elif st.session_state["current_page"] == "pagina_a":
         page_path = os.path.join(BASE_DIR, "pages", "1_Pagina_A.py")
@@ -86,5 +94,4 @@ else:
             pagina = importlib.util.module_from_spec(spec)
             sys.modules["pagina"] = pagina
             spec.loader.exec_module(pagina)
-
 
