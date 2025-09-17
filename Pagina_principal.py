@@ -1,4 +1,5 @@
 import streamlit as st
+from PIL import Image
 import os
 import sqlite3
 import utilidades as util
@@ -67,9 +68,12 @@ else:
         st.subheader("Crea tu portafolio de manera inteligente")
         st.write("Visualiza y analiza datos históricos de empresas.")
 
-        # --- Imagen desde Google Drive ---
-        img_url = "https://drive.google.com/uc?export=view&id=1eswHvq3LkFdbPNEl26_DITbd7sI9xGZV"
-        st.image(img_url, use_container_width=True)
+        # 👉 Aquí usamos la imagen que está en tu repo
+        img_path = os.path.join(BASE_DIR, "IMG_2734.PNG")
+        if os.path.exists(img_path):
+            st.image(img_path, use_container_width=True)
+        else:
+            st.warning("No se encontró la imagen de cabecera.")
 
     elif st.session_state["current_page"] == "pagina_a":
         page_path = os.path.join(BASE_DIR, "pages", "1_Pagina_A.py")
@@ -86,5 +90,7 @@ else:
             pagina = importlib.util.module_from_spec(spec)
             sys.modules["pagina"] = pagina
             spec.loader.exec_module(pagina)
+
+
 
 
