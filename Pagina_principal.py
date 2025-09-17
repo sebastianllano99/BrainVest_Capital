@@ -1,3 +1,4 @@
+# Pagina_principal.py
 import streamlit as st
 from PIL import Image
 import os
@@ -80,12 +81,13 @@ else:
         )
 
     elif st.session_state["current_page"] == "pagina_a":
-        page_path = os.path.join(BASE_DIR, "pages", "1_Pagina_A.py")
+        page_path = os.path.join(BASE_DIR, "_pages", "1_Pagina_A.py")
     elif st.session_state["current_page"] == "pagina_b":
-        page_path = os.path.join(BASE_DIR, "pages", "2_Pagina_B.py")
+        page_path = os.path.join(BASE_DIR, "_pages", "2_Pagina_B.py")
     elif st.session_state["current_page"] == "pagina_c":
-        page_path = os.path.join(BASE_DIR, "pages", "3_Pagina_C.py")
+        page_path = os.path.join(BASE_DIR, "_pages", "3_Pagina_C.py")
 
+    # Carga dinámica de la página seleccionada
     if st.session_state["current_page"] != "home":
         if not os.path.exists(page_path):
             st.error(f"No se encontró el archivo en: {page_path}")
@@ -94,4 +96,6 @@ else:
             pagina = importlib.util.module_from_spec(spec)
             sys.modules["pagina"] = pagina
             spec.loader.exec_module(pagina)
+
+
 
