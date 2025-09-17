@@ -31,6 +31,9 @@ for root, _, files in os.walk(CARPETA_DATOS):
         if f.endswith(".csv"):
             archivos.append(os.path.join(root, f))
 
+# Ordenar archivos por nombre para mantener consistencia
+archivos = sorted(archivos)
+
 if not archivos:
     st.error("No se encontraron archivos CSV en la carpeta.")
     st.stop()
@@ -40,7 +43,7 @@ tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 
 # --- Selección de ticker ---
 st.title("📈 Visualización de Históricos de Empresas")
-ticker = st.selectbox("Seleccione una empresa:", list(tickers.keys()))
+ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys()))
 
 ruta = tickers[ticker]
 df = pd.read_csv(ruta)
