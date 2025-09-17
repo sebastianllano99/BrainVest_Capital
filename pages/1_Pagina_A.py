@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 import gdown
 import zipfile
 
-# --- ID del ZIP en Google Drive ---
+# ID del ZIP en Google Drive 
 ZIP_FILE_ID = "19R9zQNq5vmNuP3l2BMvN0V7rmNvegGas"
 CARPETA_DATOS = "acciones"
 ZIP_NAME = "acciones.zip"
@@ -14,17 +14,17 @@ ZIP_NAME = "acciones.zip"
 def download_and_unzip():
     """Descarga el ZIP desde Google Drive y lo descomprime en CARPETA_DATOS."""
     url = f"https://drive.google.com/uc?export=download&id={ZIP_FILE_ID}"
-    st.info("📥 Descargando base de datos desde Google Drive, por favor espera...")
+    st.info(" Descargando base de datos desde Google Drive, por favor espera...")
     gdown.download(url, ZIP_NAME, quiet=False)
     with zipfile.ZipFile(ZIP_NAME, "r") as zf:
         zf.extractall(CARPETA_DATOS)
-    # os.remove(ZIP_NAME)  # opcional
+    # os.remove(ZIP_NAME) 
 
-# --- Preparar datos ---
+     #Preparar datos
 if not os.path.exists(CARPETA_DATOS) or len(os.listdir(CARPETA_DATOS)) == 0:
     download_and_unzip()
 
-# Buscar CSV en toda la carpeta (aunque haya subcarpetas)
+# Buscar CSV en toda la carpeta 
 archivos = []
 for root, _, files in os.walk(CARPETA_DATOS):
     for f in files:
@@ -38,17 +38,17 @@ if not archivos:
     st.error("No se encontraron archivos CSV en la carpeta.")
     st.stop()
 
-# Renombrar archivos (ej: "EC_2023.csv" -> "EC")
+# Renombrar archivos ("EC_2023.csv" -> "EC")
 tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 
-# --- Selección de ticker ---
-st.title("📈 Visualización de Históricos de Empresas")
+# Selección de ticker 
+st.title(" Visualización de Históricos de Empresas")
 ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys()))
 
 ruta = tickers[ticker]
 df = pd.read_csv(ruta)
 
-# --- Formateo de datos ---
+#Formateo de datos 
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 df = df.sort_values(by="Date")
 
@@ -57,11 +57,11 @@ if "Return" not in df.columns:
 
 df["Cumulative Return"] = (1 + df["Return"] / 100).cumprod() - 1
 
-# --- Tabla ---
-st.subheader(f"📋 Datos históricos - {ticker}")
+#Tabla 
+st.subheader(f" Datos históricos - {ticker}")
 st.dataframe(df, use_container_width=True, height=400)
 
-# --- Colores y estilos ---
+#Colores y estilos
 fondo = "#0d1b2a"
 texto = "#e0e1dd"
 verde = "#00ff7f"
@@ -87,8 +87,8 @@ def rango_xaxis():
         color=texto
     )
 
-# --- Gráfico Precio ---
-st.subheader("📊 Evolución del Precio Ajustado (Adj Close)")
+#  Gráfico Precio 
+st.subheader(" Evolución del Precio Ajustado (Adj Close)") #incorporar emoticonos
 
 fig_price = px.line(
     df, x="Date", y="Adj Close",
@@ -109,8 +109,8 @@ fig_price.update_layout(
 )
 st.plotly_chart(fig_price, use_container_width=True)
 
-# --- Gráfico Volumen ---
-st.subheader("📦 Volumen de Transacciones")
+# Gráfico Volumen
+st.subheader(" Volumen de Transacciones") #incorporar emoticonos
 
 opcion_vol = st.selectbox("Frecuencia del volumen", ["Diario", "Semanal", "Mensual"])
 df_vol = df.copy()
@@ -139,8 +139,8 @@ fig_vol.update_layout(
 )
 st.plotly_chart(fig_vol, use_container_width=True)
 
-# --- Gráfico Retornos ---
-st.subheader("📉 Retornos de la Acción")
+#  Gráfico Retornos 
+st.subheader("Retornos de la Acción") #incorporar emoticonos
 
 opcion_ret = st.selectbox("Frecuencia de retornos", ["Diario", "Semanal", "Mensual"])
 df_ret = df.copy()
@@ -185,5 +185,6 @@ fig_ret.update_layout(
     )
 )
 st.plotly_chart(fig_ret, use_container_width=True)
+
 
 
