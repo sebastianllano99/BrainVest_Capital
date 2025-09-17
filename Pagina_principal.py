@@ -1,5 +1,4 @@
 import streamlit as st
-from PIL import Image
 import os
 import sqlite3
 import utilidades as util
@@ -72,8 +71,7 @@ else:
         # Mostrar imagen principal (asegúrate de que IMG_2734.PNG esté en el repo raíz)
         img_path = os.path.join(BASE_DIR, "IMG_2734.PNG")
         if os.path.exists(img_path):
-            img = Image.open(img_path)   # abrir con PIL
-            st.image(img, use_container_width=True)
+            st.image(img_path, use_container_width=True)  # ← cambio aquí
         else:
             st.warning("No se encontró la imagen de cabecera.")
 
@@ -93,5 +91,6 @@ else:
             pagina = importlib.util.module_from_spec(spec)
             sys.modules["pagina"] = pagina
             spec.loader.exec_module(pagina)
+
 
 
