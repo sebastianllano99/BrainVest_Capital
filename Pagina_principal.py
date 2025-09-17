@@ -4,7 +4,6 @@ import sqlite3
 import utilidades as util
 import importlib.util, sys
 
-# ================== CONFIGURACIÓN DE PÁGINA ==================
 st.set_page_config(page_title="Simulación Bursátil", layout="wide")
 
 # ================== BASE DE DATOS (Jugadores) ==================
@@ -68,12 +67,9 @@ else:
         st.subheader("Crea tu portafolio de manera inteligente")
         st.write("Visualiza y analiza datos históricos de empresas.")
 
-        # Mostrar imagen principal (asegúrate de que IMG_2734.PNG esté en el repo raíz)
-        img_path = os.path.join(BASE_DIR, "IMG_2734.PNG")
-        if os.path.exists(img_path):
-            st.image(img_path, use_container_width=True)  # ← cambio aquí
-        else:
-            st.warning("No se encontró la imagen de cabecera.")
+        # Usar enlace RAW de GitHub para mostrar la imagen
+        img_url = "https://raw.githubusercontent.com/sebastianllano99/Portafolio/ef70520d06116183958a87132ba1056d95287779/IMG_2734.PNG"
+        st.image(img_url, use_container_width=True)
 
     elif st.session_state["current_page"] == "pagina_a":
         page_path = os.path.join(BASE_DIR, "pages", "1_Pagina_A.py")
@@ -82,7 +78,6 @@ else:
     elif st.session_state["current_page"] == "pagina_c":
         page_path = os.path.join(BASE_DIR, "pages", "3_Pagina_C.py")
 
-    # Cargar páginas adicionales
     if st.session_state["current_page"] != "home":
         if not os.path.exists(page_path):
             st.error(f"No se encontró el archivo en: {page_path}")
@@ -91,6 +86,5 @@ else:
             pagina = importlib.util.module_from_spec(spec)
             sys.modules["pagina"] = pagina
             spec.loader.exec_module(pagina)
-
 
 
