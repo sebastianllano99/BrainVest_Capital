@@ -69,7 +69,7 @@ else:
         st.subheader("Crea tu portafolio de manera inteligente")
         st.write("Visualiza y analiza datos históricos de empresas.")
 
-        img_path = os.path.join(BASE_DIR, "assets", "IMG_2734.PNG")
+        img_path = os.path.join(BASE_DIR, "assets", "https://drive.google.com/file/d/1eswHvq3LkFdbPNEl26_DITbd7sI9xGZV/view?usp=sharing")
         if os.path.exists(img_path):
             img = Image.open(img_path)
             st.image(img, use_container_width=True)
@@ -91,3 +91,4 @@ else:
             pagina = importlib.util.module_from_spec(spec)
             sys.modules["pagina"] = pagina
             spec.loader.exec_module(pagina)
+
