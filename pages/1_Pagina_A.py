@@ -3,17 +3,14 @@ import os
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import gdown
 import zipfile
 import datetime
 import feedparser
 import urllib.parse
-from deep_translator import GoogleTranslator
 from textblob import TextBlob
 
-# ==============================
 # CONFIGURACIÓN DE DATOS
-# ==============================
+
 ZIP_FILE_ID = "19R9zQNq5vmNuP3l2BMvN0V7rmNvegGas"
 CARPETA_DATOS = "acciones"
 ZIP_NAME = "acciones.zip"
@@ -38,23 +35,20 @@ for root, _, files in os.walk(CARPETA_DATOS):
 archivos = sorted(archivos)
 
 if not archivos:
-    st.error("No se encontraron archivos CSV en la carpeta.")
+    st.error("No se encontraron archivos CSV en la carpeta.") 
     st.stop()
 
 # Diccionario {ticker: ruta}
 tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 
-# ==============================
 # NAVEGACIÓN
-# ==============================
-st.sidebar.title("📌 Navegación")
-pagina = st.sidebar.radio("Selecciona una página:", ["📊 Análisis Histórico"])
 
-# ==============================
+st.sidebar.title(" Navegación") #incorporar emoticones o diseños que llamen más la atencion en la pagina
+pagina = st.sidebar.radio("Selecciona una página:", ["Análisis Histórico"])#incorporar emoticones o diseños que llamen más la atencion en la pagina
+
 # PÁGINA DE ANÁLISIS HISTÓRICO
-# ==============================
-if pagina == "📊 Análisis Histórico":
-    st.title("📊 Visualización de Históricos de Empresas")
+if pagina == "Análisis Histórico":
+    st.title(" Visualización de Históricos de Empresas")#incorporar emoticones o diseños que llamen más la atencion en la pagina
 
     ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys()))
     st.session_state["ticker"] = ticker
@@ -70,12 +64,10 @@ if pagina == "📊 Análisis Histórico":
         df["Return"] = df["Adj Close"].pct_change() * 100
     df["Cumulative Return"] = (1 + df["Return"] / 100).cumprod() - 1
 
-    # =======================
+    
     # Tabla
-    st.subheader(f"📑 Datos históricos - {ticker}")
+    st.subheader(f"Datos históricos - {ticker}")#incorporar emoticones o diseños que llamen más la atencion en la pagina
     st.dataframe(df, use_container_width=True, height=400)
-
-    # =======================
     # Colores y estilo
     fondo = "#0d1b2a"
     texto = "#e0e1dd"
@@ -101,9 +93,8 @@ if pagina == "📊 Análisis Histórico":
             color=texto
         )
 
-    # =======================
     # Precio
-    st.subheader("💵 Evolución del Precio Ajustado (Adj Close)")
+    st.subheader("Evolución del Precio Ajustado (Adj Close)") #incorporar emoticones o diseños que llamen más la atencion en la pagina
     fig_price = px.line(df, x="Date", y="Adj Close",
                         title=f"Evolución histórica de {ticker}",
                         labels={"Date": "Fecha", "Adj Close": "Precio Ajustado"},
@@ -111,10 +102,8 @@ if pagina == "📊 Análisis Histórico":
     fig_price.update_traces(line=dict(width=3, color=verde))
     fig_price.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_price, use_container_width=True)
-
-    # =======================
     # Volumen
-    st.subheader("📈 Volumen de Transacciones")
+    st.subheader("Volumen de Transacciones") #incorporar emoticones o diseños que llamen más la atencion en la pagina
     opcion_vol = st.selectbox("Frecuencia del volumen", ["Diario", "Semanal", "Mensual"])
     df_vol = df.copy()
     if opcion_vol == "Semanal":
@@ -129,9 +118,8 @@ if pagina == "📊 Análisis Histórico":
     fig_vol.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_vol, use_container_width=True)
 
-    # =======================
     # Retornos
-    st.subheader("📊 Retornos de la Acción")
+    st.subheader(" Retornos de la Acción")
     opcion_ret = st.selectbox("Frecuencia de retornos", ["Diario", "Semanal", "Mensual"])
     df_ret = df.copy()
     if opcion_ret == "Semanal":
@@ -149,3 +137,4 @@ if pagina == "📊 Análisis Histórico":
                                  line=dict(color=azul, width=3)))
     fig_ret.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_ret, use_container_width=True)
+
