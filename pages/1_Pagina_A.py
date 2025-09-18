@@ -1,3 +1,4 @@
+
 import streamlit as st
 import os
 import pandas as pd
@@ -182,17 +183,23 @@ fig_ret.update_layout(
 )
 st.plotly_chart(fig_ret, use_container_width=True)
 
+# ------------------------
 # Noticias
+# ------------------------
 st.header("Noticias recientes")
 ticker = st.session_state.get("ticker", None)
+
+# Controles en la barra lateral
+st.sidebar.header("Opciones de Noticias")
+fecha_inicio = st.sidebar.date_input("Mostrar noticias desde:", pd.to_datetime("2020-01-01"))
+traducir = st.sidebar.checkbox("Traducir al español", value=True)
+refrescar = st.sidebar.button("Refrescar noticias")
+
 if ticker is None:
     st.warning("Primero seleccione una empresa en la sección de históricos.")
 else:
-    st.subheader(f"Últimas noticias de {ticker}")
-    fecha_inicio = st.date_input("Mostrar noticias desde:", pd.to_datetime("2020-01-01"))
-    traducir = st.checkbox("Traducir al español", value=True)
-
-    if st.button("Refrescar noticias"):
+    if refrescar:
+        st.subheader(f"Últimas noticias de {ticker}")
         sn = StockNews(ticker, save_news=False)
         df_news = sn.read_rss()
         df_news["published"] = pd.to_datetime(df_news["published"], errors="coerce")
