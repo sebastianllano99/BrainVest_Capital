@@ -16,7 +16,7 @@ ZIP_FILE_ID = "19R9zQNq5vmNuP3l2BMvN0V7rmNvegGas"
 CARPETA_DATOS = "acciones"
 ZIP_NAME = "acciones.zip"
 
-# NewsAPI Key (regístrate en https://newsapi.org)
+# Clave de NewsAPI (debes obtenerla en https://newsapi.org/)
 NEWS_API_KEY = "TU_API_KEY_AQUI"
 
 def download_and_unzip():
@@ -204,54 +204,58 @@ if pagina == "📊 Análisis Histórico":
 # PÁGINA DE NOTICIAS
 # ==============================
 elif pagina == "📰 Noticias":
-    st.title("📰 Noticias Financieras")
+    ticker = st.sidebar.selectbox("Selecciona una empresa para ver noticias:", sorted(tickers.keys()))
 
-    # Selección de ticker (compartido con la otra página)
-    ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys()), 
-                          index=list(sorted(tickers.keys())).index(st.session_state.get("ticker", sorted(tickers.keys())[0])))
+    st.title(f"📰 Noticias de {ticker}")
 
-    st.session_state["ticker"] = ticker
-
-    # Filtros
+    # Controles
     traducir = st.sidebar.checkbox("Traducir al español", value=True)
-    fecha_min = st.sidebar.date_input("📅 Mostrar noticias desde:", datetime.date(2020, 1, 1))
-    fecha_max = st.sidebar.date_input("📅 Hasta:", datetime.date.today())
+    anio = st.sidebar.selectbox("Año", list(range(2020, datetime.datetime.now().year + 1))[::-1])
+    meses = ["Todos"] + list(range(1, 13))
+    mes = st.sidebar.selectbox("Mes", meses)
 
     if st.button("🔄 Refrescar noticias"):
         st.cache_data.clear()
 
-    # Llamada a NewsAPI
-    url = "https://newsapi.org/v2/everything"
-    params = {
-        "q": ticker,
-        "from": fecha_min.strftime("%Y-%m-%d"),
-        "to": fecha_max.strftime("%Y-%m-%d"),
-        "language": "en",
-        "sortBy": "publishedAt",
-        "apiKey": NEWS_API_KEY,
-        "pageSize": 20
-    }
-
-    response = requests.get(url, params=params)
-    data = response.json()
-
-    if "articles" not in data or len(data["articles"]) == 0:
-        st.info("No se encontraron noticias para este rango de fechas.")
+    # Calcular rango de fechas
+    if mes == "Todos":
+        fecha_inicio = datetime.date(anio, 1, 1)
+        fecha_fin = datetime.date(anio, 12, 31)
     else:
-        for article in data["articles"]:
-            fecha = pd.to_datetime(article["publishedAt"]).date()
-            titulo = article["title"]
-            descripcion = article.get("description", "")
-            url_articulo = article["url"]
+        fecha_inicio = datetime.date(anio, mes, 1)
+        if mes == 12:
+            fecha_fin = datetime.date(anio, 12, 31)
+        else:
+            fecha_fin = datetime.date(anio, mes + 1, 1) - datetime.timedelta(days=1)
+
+    # Llamar API de noticias
+    url = (
+        f"https://newsapi.org/v2/everything?"
+        f"q={ticker}&from={fecha_inicio}&to={fecha_fin}&sortBy=publishedAt&"
+        f"language=en&pageSize=10&apiKey={NEWS_API_KEY}"
+    )
+
+    resp = requests.get(url)
+    data = resp.json()
+
+    if data.get("status") != "ok" or not data.get("articles"):
+        st.info("⚠️ No se encontraron noticias para el rango seleccionado.")
+    else:
+        for art in data["articles"]:
+            fecha = art["publishedAt"][:10]
+            titulo = art["title"]
+            desc = art["description"] if art["description"] else "Sin resumen disponible."
+            url_noticia = art["url"]
 
             if traducir:
                 try:
                     titulo = GoogleTranslator(source="en", target="es").translate(titulo)
-                    descripcion = GoogleTranslator(source="en", target="es").translate(descripcion)
+                    desc = GoogleTranslator(source="en", target="es").translate(desc)
                 except Exception:
                     pass
 
             st.subheader(titulo)
             st.caption(f"Publicado: {fecha}")
-            st.write(descripcion if descripcion else "Sin descripción disponible.")
-            st.markdown(f"[Leer más en la fuente original]({url_articulo})")
+            st.write(desc)
+            st.markdown(f"[Leer más]({url_noticia})")
+            st.markdown("---")
