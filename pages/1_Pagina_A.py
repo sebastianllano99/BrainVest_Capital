@@ -5,9 +5,11 @@ import plotly.express as px
 import plotly.graph_objects as go
 import gdown
 import zipfile
-from stocknews import StockNews  # <--- agregado para las noticias
+from stocknews import StockNews  # <-- librería para noticias
 
-# ID del ZIP en Google Drive 
+# ==============================
+# CONFIGURACIÓN DE DATOS
+# ==============================
 ZIP_FILE_ID = "19R9zQNq5vmNuP3l2BMvN0V7rmNvegGas"
 CARPETA_DATOS = "acciones"
 ZIP_NAME = "acciones.zip"
@@ -20,52 +22,58 @@ def download_and_unzip():
     with zipfile.ZipFile(ZIP_NAME, "r") as zf:
         zf.extractall(CARPETA_DATOS)
 
-# Preparar datos
 if not os.path.exists(CARPETA_DATOS) or len(os.listdir(CARPETA_DATOS)) == 0:
     download_and_unzip()
 
-# Buscar CSV en toda la carpeta 
+# Buscar CSV en la carpeta
 archivos = []
 for root, _, files in os.walk(CARPETA_DATOS):
     for f in files:
         if f.endswith(".csv"):
             archivos.append(os.path.join(root, f))
 
-# Ordenar archivos por nombre para mantener consistencia
 archivos = sorted(archivos)
 
 if not archivos:
     st.error("No se encontraron archivos CSV en la carpeta.")
     st.stop()
 
-# Renombrar archivos ("EC_2023.csv" -> "EC")
+# Diccionario {ticker: ruta}
 tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 
-# ---------------- PÁGINAS ----------------
-pagina = st.sidebar.radio("📂 Seleccione página", ["📊 Análisis Histórico", "📰 Noticias"])
+# ==============================
+# NAVEGACIÓN
+# ==============================
+st.sidebar.title("📌 Navegación")
+pagina = st.sidebar.radio("Selecciona una página:", ["📊 Análisis Histórico", "📰 Noticias"])
 
+# ==============================
+# PÁGINA DE ANÁLISIS HISTÓRICO
+# ==============================
 if pagina == "📊 Análisis Histórico":
-    # Selección de ticker 
     st.title("📊 Visualización de Históricos de Empresas")
+
     ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys()))
+    st.session_state["ticker"] = ticker  # guardamos selección para compartirla
 
     ruta = tickers[ticker]
     df = pd.read_csv(ruta)
 
-    # Formateo de datos 
+    # Formateo
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df = df.sort_values(by="Date")
 
     if "Return" not in df.columns:
         df["Return"] = df["Adj Close"].pct_change() * 100
-
     df["Cumulative Return"] = (1 + df["Return"] / 100).cumprod() - 1
 
-    # Tabla 
+    # =======================
+    # Tabla
     st.subheader(f"📑 Datos históricos - {ticker}")
     st.dataframe(df, use_container_width=True, height=400)
 
-    # Colores y estilos
+    # =======================
+    # Estilos de gráficos
     fondo = "#0d1b2a"
     texto = "#e0e1dd"
     verde = "#00ff7f"
@@ -91,16 +99,15 @@ if pagina == "📊 Análisis Histórico":
             color=texto
         )
 
-    #  Gráfico Precio 
-    st.subheader("📈 Evolución del Precio Ajustado (Adj Close)")
-
+    # =======================
+    # Gráfico Precio
+    st.subheader("💵 Evolución del Precio Ajustado (Adj Close)")
     fig_price = px.line(
         df, x="Date", y="Adj Close",
         title=f"Evolución histórica de {ticker}",
         labels={"Date": "Fecha", "Adj Close": "Precio Ajustado"},
         template="plotly_dark"
     )
-
     fig_price.update_traces(line=dict(width=3, color=verde))
     fig_price.update_xaxes(**rango_xaxis())
     fig_price.update_layout(
@@ -113,9 +120,9 @@ if pagina == "📊 Análisis Histórico":
     )
     st.plotly_chart(fig_price, use_container_width=True)
 
+    # =======================
     # Gráfico Volumen
-    st.subheader("📊 Volumen de Transacciones")
-
+    st.subheader("📈 Volumen de Transacciones")
     opcion_vol = st.selectbox("Frecuencia del volumen", ["Diario", "Semanal", "Mensual"])
     df_vol = df.copy()
 
@@ -130,7 +137,6 @@ if pagina == "📊 Análisis Histórico":
         labels={"Date": "Fecha", "Volume": "Acciones Negociadas"},
         template="plotly_dark"
     )
-
     fig_vol.update_traces(line=dict(width=2.5, color=naranja))
     fig_vol.update_xaxes(**rango_xaxis())
     fig_vol.update_layout(
@@ -143,9 +149,9 @@ if pagina == "📊 Análisis Histórico":
     )
     st.plotly_chart(fig_vol, use_container_width=True)
 
-    #  Gráfico Retornos 
-    st.subheader("📉 Retornos de la Acción")
-
+    # =======================
+    # Gráfico Retornos
+    st.subheader("📊 Retornos de la Acción")
     opcion_ret = st.selectbox("Frecuencia de retornos", ["Diario", "Semanal", "Mensual"])
     df_ret = df.copy()
 
@@ -169,7 +175,6 @@ if pagina == "📊 Análisis Histórico":
         mode="lines", name="Retorno Acumulado (%)",
         line=dict(color=azul, width=3)
     ))
-
     fig_ret.update_xaxes(**rango_xaxis())
     fig_ret.update_layout(
         height=500,
@@ -190,22 +195,31 @@ if pagina == "📊 Análisis Histórico":
     )
     st.plotly_chart(fig_ret, use_container_width=True)
 
-# ---------------- PÁGINA DE NOTICIAS ----------------
+# ==============================
+# PÁGINA DE NOTICIAS
+# ==============================
 elif pagina == "📰 Noticias":
-    st.title(f"📰 Noticias recientes de {ticker}")
+    ticker = st.session_state.get("ticker", None)
 
-    sn = StockNews(ticker, save_news=False)
-    df_news = sn.read_rss()
+    if ticker is None:
+        st.warning("⚠️ Primero seleccione una empresa en la página de Análisis Histórico.")
+    else:
+        st.title(f"📰 Noticias recientes de {ticker}")
 
-    for i in range(10):
-        st.subheader(f"🗞️ Noticia {i+1}")
-        st.write(df_news["published"][i])
-        st.write(df_news["title"][i])
-        st.write(df_news["summary"][i])
+        if st.button("🔄 Refrescar noticias"):
+            st.cache_data.clear()  # limpia cache para forzar nueva lectura
 
-        title_sentiment = df_news["sentiment_title"][i]
-        news_sentiment = df_news["sentiment_summary"][i]
+        sn = StockNews(ticker, save_news=False)
+        df_news = sn.read_rss()
 
-        st.write(f"📌 Sentimiento del título: {title_sentiment}")
-        st.write(f"📌 Sentimiento de la noticia: {news_sentiment}")
+        for i in range(min(10, len(df_news))):
+            st.subheader(f"🗞️ Noticia {i+1}")
+            st.write(df_news["published"][i])
+            st.write(df_news["title"][i])
+            st.write(df_news["summary"][i])
 
+            title_sentiment = df_news["sentiment_title"][i]
+            news_sentiment = df_news["sentiment_summary"][i]
+
+            st.write(f"📌 Sentimiento del título: {title_sentiment}")
+            st.write(f"📌 Sentimiento de la noticia: {news_sentiment}")
