@@ -47,7 +47,7 @@ tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 # ==============================
 # NAVEGACIÓN
 # ==============================
-#st.sidebar.title("📌 Navegación")
+st.sidebar.title("📌 Navegación")
 #pagina = st.sidebar.radio("Selecciona una página:", ["📊 Análisis Histórico"]) para agregar subpaginas en caso de requerir 
 
 # ==============================
@@ -146,6 +146,7 @@ if pagina == "📊 Análisis Histórico":
                                  line=dict(color=azul, width=3)))
     fig_ret.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_ret, use_container_width=True)
+
 
 
 
