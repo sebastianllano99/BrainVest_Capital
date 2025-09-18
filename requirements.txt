@@ -7,5 +7,6 @@ stocknews
 gdown
 deep-translator
 gnews
+textblob
 
 
