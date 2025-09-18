@@ -1,49 +1,52 @@
 import streamlit as st
 import pandas as pd
-import altair as alt
-import sys, os
+import matplotlib.pyplot as plt
 
-#  Ajuste para que encuentre utilidades.py
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-import utilidades as util
+def mi_portafolio():
+    st.title("📊 Mi Portafolio de Inversión")
 
-# Ocultamos sidebar y aplicamos estilos
-util.aplicar_estilos()
+    # Dinero inicial para invertir
+    monto_total = st.number_input("Monto inicial a invertir (USD)", min_value=1000, value=10000, step=500)
 
-#  Bloqueamos acceso directo
-if "current_page" not in st.session_state or st.session_state["current_page"] != "pagina_b":
-    st.warning(" Accede a esta sección solo desde el menú superior en la página principal.")
-    st.stop()
+    st.info("""
+    **Instrucciones**  
+    1. Descargue o prepare un archivo CSV con dos columnas:  
+       - `Empresa`: Nombre o ticker de la acción.  
+       - `Porcentaje`: Porcentaje de inversión destinado a esa acción.  
+    2. Asegúrese de que la suma de porcentajes sea igual a 100.  
+    3. Suba el archivo CSV en el recuadro de abajo.
+    """)
 
-# Si entra correctamente desde el menú horizontal
-util.generarMenu_horizontal()
-st.title("📈 Simulación")
+    # Subida del archivo CSV
+    archivo_csv = st.file_uploader("📂 Suba su archivo CSV con la distribución del portafolio", type=["csv"])
 
-#  Entrada de datos 
-start, end, symbol = util.get_input()
-df = util.get_data(symbol, start, end)
-company_name = util.get_company_name(symbol)
+    if archivo_csv is not None:
+        try:
+            df = pd.read_csv(archivo_csv)
 
-# Normalizar columnas 
-df = df.rename(columns=lambda x: x.strip().lower().replace(" ", "_"))
+            # Validación de columnas
+            if "Empresa" not in df.columns or "Porcentaje" not in df.columns:
+                st.error("❌ El archivo CSV debe contener las columnas: Empresa y Porcentaje.")
+                return
 
-if df.empty:
-    st.warning("No hay datos para el rango de fechas seleccionado.")
-else:
-    st.subheader(f"{company_name} - Retornos diarios")
+            # Validación de porcentajes
+            total_pct = df["Porcentaje"].sum()
+            if total_pct != 100:
+                st.error(f"❌ Los porcentajes deben sumar 100. Actualmente suman {total_pct}%.")
+                return
 
-    if "precio_cierre" in df.columns:
-        # Convertir a número antes de calcular retornos
-        df["precio_cierre"] = pd.to_numeric(df["precio_cierre"], errors="coerce")
-        df["retorno_diario"] = df["precio_cierre"].pct_change()
+            # Cálculo de montos por empresa
+            df["Monto Invertido (USD)"] = (df["Porcentaje"] / 100) * monto_total
 
-        chart = alt.Chart(df.dropna()).mark_line(color="green").encode(
-            x=alt.X("fecha:T", title="Fecha", axis=alt.Axis(format="%b %Y", labelAngle=-45)),
-            y=alt.Y("retorno_diario:Q", title="Retorno Diario")
-        ).properties(width=700, height=400).interactive()
-        st.altair_chart(chart, use_container_width=True)
-    else:
-        st.error(" No encontré columna de precio de cierre")
+            st.success("✅ Portafolio cargado correctamente.")
+            st.write("### Distribución del Portafolio")
+            st.dataframe(df, use_container_width=True)
 
-    # --- Tabla estadística ---
-    util.mostrar_tabla_estadistica(df, " Estadísticas comparativas")
+            # Gráfico de torta
+            fig, ax = plt.subplots()
+            ax.pie(df["Porcentaje"], labels=df["Empresa"], autopct='%1.1f%%', startangle=90)
+            ax.axis("equal")  # Hacer el gráfico circular
+            st.pyplot(fig)
+
+        except Exception as e:
+            st.error(f"⚠️ Error al procesar el archivo: {e}")
