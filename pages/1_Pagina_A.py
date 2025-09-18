@@ -5,9 +5,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import gdown
 import zipfile
-from stocknews import StockNews
-from deep_translator import GoogleTranslator
 import datetime
+import requests
+from deep_translator import GoogleTranslator
 
 # ==============================
 # CONFIGURACIÓN DE DATOS
@@ -15,6 +15,9 @@ import datetime
 ZIP_FILE_ID = "19R9zQNq5vmNuP3l2BMvN0V7rmNvegGas"
 CARPETA_DATOS = "acciones"
 ZIP_NAME = "acciones.zip"
+
+# NewsAPI Key (regístrate en https://newsapi.org)
+NEWS_API_KEY = "TU_API_KEY_AQUI"
 
 def download_and_unzip():
     """Descarga el ZIP desde Google Drive y lo descomprime en CARPETA_DATOS."""
@@ -201,54 +204,54 @@ if pagina == "📊 Análisis Histórico":
 # PÁGINA DE NOTICIAS
 # ==============================
 elif pagina == "📰 Noticias":
-    ticker = st.session_state.get("ticker", None)
+    st.title("📰 Noticias Financieras")
 
-    if ticker is None:
-        st.warning("⚠️ Primero seleccione una empresa en la página de Análisis Histórico.")
+    # Selección de ticker (compartido con la otra página)
+    ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys()), 
+                          index=list(sorted(tickers.keys())).index(st.session_state.get("ticker", sorted(tickers.keys())[0])))
+
+    st.session_state["ticker"] = ticker
+
+    # Filtros
+    traducir = st.sidebar.checkbox("Traducir al español", value=True)
+    fecha_min = st.sidebar.date_input("📅 Mostrar noticias desde:", datetime.date(2020, 1, 1))
+    fecha_max = st.sidebar.date_input("📅 Hasta:", datetime.date.today())
+
+    if st.button("🔄 Refrescar noticias"):
+        st.cache_data.clear()
+
+    # Llamada a NewsAPI
+    url = "https://newsapi.org/v2/everything"
+    params = {
+        "q": ticker,
+        "from": fecha_min.strftime("%Y-%m-%d"),
+        "to": fecha_max.strftime("%Y-%m-%d"),
+        "language": "en",
+        "sortBy": "publishedAt",
+        "apiKey": NEWS_API_KEY,
+        "pageSize": 20
+    }
+
+    response = requests.get(url, params=params)
+    data = response.json()
+
+    if "articles" not in data or len(data["articles"]) == 0:
+        st.info("No se encontraron noticias para este rango de fechas.")
     else:
-        st.title(f"📰 Noticias de {ticker}")
+        for article in data["articles"]:
+            fecha = pd.to_datetime(article["publishedAt"]).date()
+            titulo = article["title"]
+            descripcion = article.get("description", "")
+            url_articulo = article["url"]
 
-        # Opciones
-        traducir = st.sidebar.checkbox("Traducir al español", value=True)
+            if traducir:
+                try:
+                    titulo = GoogleTranslator(source="en", target="es").translate(titulo)
+                    descripcion = GoogleTranslator(source="en", target="es").translate(descripcion)
+                except Exception:
+                    pass
 
-        # Filtro de fecha mínimo
-        fecha_min = st.sidebar.date_input("📅 Mostrar noticias desde:", datetime.date(2020, 1, 1))
-
-        if st.button("🔄 Refrescar noticias"):
-            st.cache_data.clear()  # limpia cache para forzar nueva lectura
-
-        sn = StockNews(ticker, save_news=False)
-        df_news = sn.read_rss()
-
-        if df_news.empty:
-            st.info("No se encontraron noticias recientes.")
-        else:
-            # Convertir fechas a datetime sin timezone
-            df_news["published"] = pd.to_datetime(df_news["published"], errors="coerce").dt.tz_localize(None)
-            fecha_min = pd.to_datetime(fecha_min)
-
-            # Filtrar noticias por fecha mínima
-            df_news = df_news[df_news["published"] >= fecha_min]
-
-            if df_news.empty:
-                st.info("⚠️ No hay noticias para el rango de fechas seleccionado.")
-            else:
-                for i in range(min(10, len(df_news))):
-                    fecha = df_news["published"].iloc[i]
-                    titulo = df_news["title"].iloc[i]
-                    resumen = df_news["summary"].iloc[i]
-
-                    if traducir:
-                        try:
-                            titulo = GoogleTranslator(source="en", target="es").translate(titulo)
-                            resumen = GoogleTranslator(source="en", target="es").translate(resumen)
-                        except Exception:
-                            pass
-
-                    st.subheader(titulo)
-                    st.caption(f"Publicado: {fecha.date() if pd.notnull(fecha) else 'Fecha no disponible'}")
-                    st.write(resumen)
-                    st.markdown(f"""
-                    - Sentimiento del título: {df_news['sentiment_title'].iloc[i]}  
-                    - Sentimiento del resumen: {df_news['sentiment_summary'].iloc[i]}  
-                    """)
+            st.subheader(titulo)
+            st.caption(f"Publicado: {fecha}")
+            st.write(descripcion if descripcion else "Sin descripción disponible.")
+            st.markdown(f"[Leer más en la fuente original]({url_articulo})")
