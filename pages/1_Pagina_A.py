@@ -5,9 +5,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import gdown
 import zipfile
-import datetime
-import requests
 from deep_translator import GoogleTranslator
+import datetime
+from gnews import GNews
 
 # ==============================
 # CONFIGURACIÓN DE DATOS
@@ -15,9 +15,6 @@ from deep_translator import GoogleTranslator
 ZIP_FILE_ID = "19R9zQNq5vmNuP3l2BMvN0V7rmNvegGas"
 CARPETA_DATOS = "acciones"
 ZIP_NAME = "acciones.zip"
-
-# Clave de NewsAPI (debes obtenerla en https://newsapi.org/)
-NEWS_API_KEY = "TU_API_KEY_AQUI"
 
 def download_and_unzip():
     """Descarga el ZIP desde Google Drive y lo descomprime en CARPETA_DATOS."""
@@ -204,58 +201,46 @@ if pagina == "📊 Análisis Histórico":
 # PÁGINA DE NOTICIAS
 # ==============================
 elif pagina == "📰 Noticias":
-    ticker = st.sidebar.selectbox("Selecciona una empresa para ver noticias:", sorted(tickers.keys()))
+    ticker = st.sidebar.selectbox("Seleccione una empresa para ver noticias:", sorted(tickers.keys()))
 
     st.title(f"📰 Noticias de {ticker}")
 
-    # Controles
     traducir = st.sidebar.checkbox("Traducir al español", value=True)
-    anio = st.sidebar.selectbox("Año", list(range(2020, datetime.datetime.now().year + 1))[::-1])
-    meses = ["Todos"] + list(range(1, 13))
-    mes = st.sidebar.selectbox("Mes", meses)
 
-    if st.button("🔄 Refrescar noticias"):
-        st.cache_data.clear()
+    # Filtros de fecha
+    year = st.sidebar.number_input("Año:", min_value=2000, max_value=datetime.date.today().year, value=datetime.date.today().year)
+    month = st.sidebar.number_input("Mes (1-12):", min_value=1, max_value=12, value=datetime.date.today().month)
 
-    # Calcular rango de fechas
-    if mes == "Todos":
-        fecha_inicio = datetime.date(anio, 1, 1)
-        fecha_fin = datetime.date(anio, 12, 31)
-    else:
-        fecha_inicio = datetime.date(anio, mes, 1)
-        if mes == 12:
-            fecha_fin = datetime.date(anio, 12, 31)
+    if st.button("🔄 Buscar noticias"):
+        google_news = GNews(language="en", country="US", period="30d", max_results=10)
+        try:
+            noticias = google_news.get_news_by_date(
+                query=ticker,
+                from_date=datetime.date(year, month, 1),
+                to_date=datetime.date(year, month, 28)  # hasta el 28 por seguridad
+            )
+        except Exception as e:
+            st.error(f"Error al consultar noticias: {e}")
+            noticias = []
+
+        if not noticias:
+            st.info("⚠️ No se encontraron noticias para el rango seleccionado.")
         else:
-            fecha_fin = datetime.date(anio, mes + 1, 1) - datetime.timedelta(days=1)
+            for n in noticias[:10]:
+                titulo = n["title"]
+                desc = n.get("description", "Sin resumen disponible")
+                fecha = n.get("published date", "Sin fecha")
+                url_noticia = n.get("url", "#")
 
-    # Llamar API de noticias
-    url = (
-        f"https://newsapi.org/v2/everything?"
-        f"q={ticker}&from={fecha_inicio}&to={fecha_fin}&sortBy=publishedAt&"
-        f"language=en&pageSize=10&apiKey={NEWS_API_KEY}"
-    )
+                if traducir:
+                    try:
+                        titulo = GoogleTranslator(source="en", target="es").translate(titulo)
+                        desc = GoogleTranslator(source="en", target="es").translate(desc)
+                    except Exception:
+                        pass
 
-    resp = requests.get(url)
-    data = resp.json()
-
-    if data.get("status") != "ok" or not data.get("articles"):
-        st.info("⚠️ No se encontraron noticias para el rango seleccionado.")
-    else:
-        for art in data["articles"]:
-            fecha = art["publishedAt"][:10]
-            titulo = art["title"]
-            desc = art["description"] if art["description"] else "Sin resumen disponible."
-            url_noticia = art["url"]
-
-            if traducir:
-                try:
-                    titulo = GoogleTranslator(source="en", target="es").translate(titulo)
-                    desc = GoogleTranslator(source="en", target="es").translate(desc)
-                except Exception:
-                    pass
-
-            st.subheader(titulo)
-            st.caption(f"Publicado: {fecha}")
-            st.write(desc)
-            st.markdown(f"[Leer más]({url_noticia})")
-            st.markdown("---")
+                st.subheader(titulo)
+                st.caption(f"Publicado: {fecha}")
+                st.write(desc)
+                st.markdown(f"[Leer más]({url_noticia})")
+                st.markdown("---")
