@@ -8,5 +8,7 @@ gdown
 deep-translator
 gnews
 textblob
+matplotlib
+
 
 
