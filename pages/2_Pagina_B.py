@@ -7,10 +7,12 @@ import plotly.express as px
 # ==============================
 st.title("💼 Mi Portafolio de Inversión")
 
-# Dinero inicial
-monto_total = st.number_input("Monto inicial a invertir (USD)", min_value=1000, value=10000, step=500)
+# Monto fijo de inversión
+monto_total = 500_000_000  # 500 millones COP
+st.info(f"El monto total disponible para invertir es de **${monto_total:,.0f} COP**. "
+        "Este valor es fijo y no puede modificarse.")
 
-st.info("""
+st.write("""
 **Instrucciones**
 1. Prepare un archivo CSV con dos columnas:
    - `Empresa`: Nombre o ticker de la acción.
@@ -35,7 +37,7 @@ if archivo_csv is not None:
                 st.error(f"❌ Los porcentajes deben sumar 100. Actualmente suman {total_pct}%.")
             else:
                 # Cálculo de montos
-                df["Monto Invertido (USD)"] = (df["Porcentaje"] / 100) * monto_total
+                df["Monto Invertido (COP)"] = (df["Porcentaje"] / 100) * monto_total
 
                 st.success("✅ Portafolio cargado correctamente.")
                 st.subheader("📑 Distribución del Portafolio")
