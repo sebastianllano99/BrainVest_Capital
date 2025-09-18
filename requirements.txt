@@ -5,3 +5,5 @@ yfinance==0.2.43
 numpy==1.26.4
 stocknews
 gdown
+deep-translator
+
