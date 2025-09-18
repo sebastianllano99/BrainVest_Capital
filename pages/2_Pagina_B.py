@@ -26,14 +26,13 @@ st.warning(
 )
 
 # -------------------------
-# Detectar tickers disponibles (normalizando nombres de archivos)
+# Detectar tickers disponibles
 # -------------------------
 available_tickers = set()
 if os.path.isdir(DATA_FOLDER):
     for root, _, files in os.walk(DATA_FOLDER):
         for f in files:
             if f.lower().endswith(".csv"):
-                # Extraer solo el ticker antes del primer "_"
                 ticker = os.path.basename(f).split("_")[0].upper()
                 available_tickers.add(ticker)
 else:
@@ -47,10 +46,7 @@ if available_tickers:
 else:
     sample_tickers = ["AAPL", "MSFT", "GOOG", "AMZN"]
 
-sample_df = pd.DataFrame({
-    "Ticker": sample_tickers,
-    "Porcentaje": [40, 30, 20, 10]
-})
+sample_df = pd.DataFrame({"Ticker": sample_tickers, "Porcentaje": [40, 30, 20, 10]})
 st.download_button(
     label="⬇️ Descargar CSV de ejemplo",
     data=sample_df.to_csv(index=False).encode("utf-8"),
@@ -75,7 +71,6 @@ if uploaded is not None:
             st.error("❌ El CSV debe contener las columnas `Ticker` y `Porcentaje`.")
         else:
             df = df.rename(columns={cols_map["ticker"]: "Ticker", cols_map["porcentaje"]: "Porcentaje"})
-
             df["Ticker"] = df["Ticker"].astype(str).str.strip().str.upper()
             df["Porcentaje"] = pd.to_numeric(df["Porcentaje"], errors="coerce")
 
@@ -86,7 +81,6 @@ if uploaded is not None:
                 if abs(suma_pct - 100) > 0.01:
                     st.error(f"❌ Los porcentajes deben sumar 100. Actualmente suman {suma_pct:.6f}.")
                 else:
-                    # Validar tickers contra archivos disponibles
                     if available_tickers:
                         missing = [t for t in df["Ticker"] if t not in available_tickers]
                         if missing:
@@ -105,11 +99,45 @@ if uploaded is not None:
                     total_invertido = int(df["Inversion (COP)"].sum())
                     st.success(f"✅ Portafolio válido. Total invertido: {total_invertido:,.0f} COP")
 
-                    # gráfico torta
-                    fig = px.pie(df, names="Ticker", values="Porcentaje",
-                                 title="Distribución del Portafolio (%)",
-                                 template="plotly_dark", hole=0.3)
-                    fig.update_traces(textinfo="percent+label")
+                    # -------------------------
+                    # Selector de gráfico
+                    # -------------------------
+                    chart_type = st.radio("📊 Selecciona el tipo de gráfico:", ["Torta", "Barras"])
+
+                    # paleta corporativa sobria
+                    palette = ["#1f77b4", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b", "#17becf"]
+
+                    if chart_type == "Torta":
+                        fig = px.pie(
+                            df,
+                            names="Ticker",
+                            values="Porcentaje",
+                            title="Distribución del Portafolio (%)",
+                            hole=0.3,
+                            color_discrete_sequence=palette
+                        )
+                        fig.update_traces(textinfo="percent+label", textfont_size=14, pull=[0.02]*len(df))
+                    else:
+                        fig = px.bar(
+                            df,
+                            x="Porcentaje",
+                            y="Ticker",
+                            orientation="h",
+                            text="Porcentaje",
+                            title="Distribución del Portafolio (%)",
+                            color="Ticker",
+                            color_discrete_sequence=palette
+                        )
+                        fig.update_traces(texttemplate="%{text:.2f}%", textposition="outside")
+                        fig.update_layout(yaxis=dict(categoryorder="total ascending"))
+
+                    fig.update_layout(
+                        title_font=dict(size=22, color="#2c3e50"),
+                        legend_title="Acciones",
+                        legend=dict(font=dict(size=12, color="#2c3e50")),
+                        plot_bgcolor="white",
+                        paper_bgcolor="white"
+                    )
                     st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
