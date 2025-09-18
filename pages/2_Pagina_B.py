@@ -5,28 +5,25 @@ import plotly.express as px
 import matplotlib.colors as mcolors
 import numpy as np
 
-# -------------------------
 # Config
-# -------------------------
+
 CAPITAL_TOTAL = 500_000_000  # 500 millones COP (fijo)
 DATA_FOLDER = "acciones"     # carpeta donde están los CSV de Yahoo
 
-# -------------------------
-# Función para generar paleta monocromática
-# -------------------------
+# color
+
 def generar_paleta(base_color, n):
     cmap = mcolors.LinearSegmentedColormap.from_list("custom", ["#ffffff", base_color, "#000000"])
     return [mcolors.to_hex(cmap(i)) for i in np.linspace(0.2, 0.8, n)]
+# Interfaz de usuario en la pagina, incorporar a los titulos emoticones o diseños que llamen más la atencion en la pagina
 
-# -------------------------
-# Interfaz
-# -------------------------
-st.title("📊 Mi Portafolio de Inversión")
-st.info(f"💰 El monto total disponible para invertir es **${CAPITAL_TOTAL:,.0f} COP** (fijo).")
-
+st.title(" Mi Portafolio de Inversión")
+st.info(f" El monto total disponible para invertir es **${CAPITAL_TOTAL:,.0f} COP** (fijo).")
+ 
+#incorporar emoticones o diseños que llamen más la atencion en la pagina
 st.warning(
     """
-🔔 **Recuerda**:
+**Recuerda**: 
 - El CSV debe contener **dos columnas**: `Ticker` y `Porcentaje`.
 - El `Ticker` debe coincidir con los tickers de tus archivos en la carpeta `acciones/`.  
   Ejemplo: si el archivo es `AAPL_2000-01-01_2024-12-31.csv`, el ticker válido es **AAPL**.
@@ -34,9 +31,8 @@ st.warning(
 """
 )
 
-# -------------------------
 # Detectar tickers disponibles
-# -------------------------
+
 available_tickers = set()
 if os.path.isdir(DATA_FOLDER):
     for root, _, files in os.walk(DATA_FOLDER):
@@ -45,11 +41,10 @@ if os.path.isdir(DATA_FOLDER):
                 ticker = os.path.basename(f).split("_")[0].upper()
                 available_tickers.add(ticker)
 else:
-    st.info(f"Nota: la carpeta `{DATA_FOLDER}` no se encontró. La validación automática de tickers será omitida.")
+    st.info(f"Nota: la carpeta `{DATA_FOLDER}` no se encontró. La validación automática de tickers será omitida.") #incorporar emoticones o diseños que llamen más la atencion en la pagina
 
-# -------------------------
 # Botón para descargar CSV ejemplo
-# -------------------------
+
 if available_tickers:
     sample_tickers = list(available_tickers)[:4]
 else:
@@ -57,7 +52,7 @@ else:
 
 sample_df = pd.DataFrame({"Ticker": sample_tickers, "Porcentaje": [40, 30, 20, 10]})
 st.download_button(
-    label="⬇️ Descargar CSV de ejemplo",
+    label="⬇Descargar CSV de ejemplo", #incorporar emoticones o diseños que llamen más la atencion en la pagina
     data=sample_df.to_csv(index=False).encode("utf-8"),
     file_name="ejemplo_portafolio.csv",
     mime="text/csv",
@@ -65,55 +60,54 @@ st.download_button(
 
 st.markdown("---")
 
-# -------------------------
-# Subida del CSV
-# -------------------------
-uploaded = st.file_uploader("📂 Sube tu archivo CSV (Ticker, Porcentaje)", type=["csv"])
+
+# Subida del archivo CSV
+
+uploaded = st.file_uploader(" Sube tu archivo CSV (Ticker, Porcentaje)", type=["csv"])#incorporar emoticones o diseños que llamen más la atencion en la pagina
 
 if uploaded is not None:
     try:
         df = pd.read_csv(uploaded)
-
         # normalizar nombres de columnas
         cols_map = {c.lower().strip(): c for c in df.columns}
         if "ticker" not in cols_map or "porcentaje" not in cols_map:
-            st.error("❌ El CSV debe contener las columnas `Ticker` y `Porcentaje`.")
+            st.error("El CSV debe contener las columnas `Ticker` y `Porcentaje`.")#incorporar emoticones o diseños que llamen más la atencion en la pagina
         else:
             df = df.rename(columns={cols_map["ticker"]: "Ticker", cols_map["porcentaje"]: "Porcentaje"})
             df["Ticker"] = df["Ticker"].astype(str).str.strip().str.upper()
             df["Porcentaje"] = pd.to_numeric(df["Porcentaje"], errors="coerce")
 
             if df["Porcentaje"].isnull().any():
-                st.error("❌ Hay valores no numéricos en la columna `Porcentaje`.")
+                st.error(" Hay valores no numéricos en la columna `Porcentaje`.")#incorporar emoticones o diseños que llamen más la atencion en la pagina
             else:
                 suma_pct = df["Porcentaje"].sum()
                 if abs(suma_pct - 100) > 0.01:
-                    st.error(f"❌ Los porcentajes deben sumar 100. Actualmente suman {suma_pct:.6f}.")
+                    st.error(f" Los porcentajes deben sumar 100. Actualmente suman {suma_pct:.6f}.")#incorporar emoticones o diseños que llamen más la atencion en la pagina
                 else:
                     if available_tickers:
                         missing = [t for t in df["Ticker"] if t not in available_tickers]
                         if missing:
                             st.error(
-                                "❌ Algunos tickers del CSV no se encontraron en la carpeta 'acciones':\n\n"
+                                " Algunos tickers del CSV no se encontraron en la carpeta 'acciones':\n\n"
                                 + ", ".join(missing)
                             )
                             st.stop()
-
+#incorporar emoticones o diseños que llamen más la atencion en la pagina
                     # calcular montos
                     df["Inversion (COP)"] = (df["Porcentaje"] / 100.0 * CAPITAL_TOTAL).round(0).astype(int)
 
-                    st.subheader("📋 Distribución del Portafolio")
+                    st.subheader(" Distribución del Portafolio")
                     st.dataframe(df, use_container_width=True)
 
                     total_invertido = int(df["Inversion (COP)"].sum())
-                    st.success(f"✅ Portafolio válido. Total invertido: {total_invertido:,.0f} COP")
+                    st.success(f"Portafolio válido. Total invertido: {total_invertido:,.0f} COP")
 
-                    # -------------------------
+
                     # Selector de gráfico
-                    # -------------------------
-                    chart_type = st.radio("📊 Selecciona el tipo de gráfico:", ["Torta", "Barras"])
+                 #incorporar emoticones o diseños que llamen más la atencion en la pagina
+                    chart_type = st.radio(" Selecciona el tipo de gráfico:", ["Torta", "Barras"])
 
-                    # generar paleta monocromática (ejemplo: azul corporativo #1f77b4)
+                    # paleta color
                     palette = generar_paleta("#1f77b4", len(df))
 
                     if chart_type == "Torta":
@@ -121,7 +115,7 @@ if uploaded is not None:
                             df,
                             names="Ticker",
                             values="Porcentaje",
-                            title="Distribución del Portafolio (%)",
+                            title="Distribución del Portafolio (%)",#incorporar emoticones o diseños que llamen más la atencion en la pagina
                             hole=0.3,
                             color="Ticker",
                             color_discrete_sequence=palette
@@ -134,17 +128,17 @@ if uploaded is not None:
                             y="Ticker",
                             orientation="h",
                             text="Porcentaje",
-                            title="Distribución del Portafolio (%)",
+                            title="Distribución del Portafolio (%)",#incorporar emoticones o diseños que llamen más la atencion en la pagina
                             color="Ticker",
                             color_discrete_sequence=palette
                         )
                         fig.update_traces(texttemplate="%{text:.2f}%", textposition="outside")
                         fig.update_layout(yaxis=dict(categoryorder="total ascending"))
 
-                    # Fondo oscuro elegante
+                    # Fondo 
                     fig.update_layout(
                         title_font=dict(size=22, color="white"),
-                        legend_title="Acciones",
+                        legend_title="Acciones", #incorporar emoticones o diseños que llamen más la atencion en la pagina
                         legend=dict(font=dict(size=12, color="white")),
                         plot_bgcolor="#1e1e2f",   # gris oscuro
                         paper_bgcolor="#1e1e2f",  # gris oscuro
@@ -153,6 +147,7 @@ if uploaded is not None:
                     st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
-        st.error(f"⚠️ Error al procesar el archivo: {e}")
+        st.error(f"Error al procesar el archivo: {e}")
 else:
-    st.info("📥 Sube un CSV para ver la distribución.")
+    st.info("Sube un CSV para ver la distribución.")
+#incorporar emoticones o diseños que llamen más la atencion en la pagina
