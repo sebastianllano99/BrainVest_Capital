@@ -3,12 +3,8 @@ pandas==2.2.3
 plotly==5.24.1
 yfinance==0.2.43
 numpy==1.26.4
-stocknews
-gdown
-deep-translator
-gnews
-textblob
-matplotlib
+
+
 
 
 
