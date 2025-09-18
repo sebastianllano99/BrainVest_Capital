@@ -1,4 +1,3 @@
-
 import streamlit as st
 import os
 import pandas as pd
@@ -8,6 +7,7 @@ import gdown
 import zipfile
 from stocknews import StockNews
 from deep_translator import GoogleTranslator
+from datetime import datetime
 
 # ==============================
 # CONFIGURACIÓN DE DATOS
@@ -208,11 +208,15 @@ elif pagina == "📰 Noticias":
     else:
         st.title(f"📰 Noticias recientes de {ticker}")
 
-        # Opciones
-        traducir = st.sidebar.checkbox("Traducir al español", value=True)
+        # Segmentador de fecha
+        col1, col2 = st.columns([2,1])
+        with col1:
+            fecha_min = st.date_input("📅 Ver noticias desde:", datetime(2020,1,1))
+        with col2:
+            if st.button("🔄 Refrescar noticias"):
+                st.cache_data.clear()  # limpia cache para forzar nueva lectura
 
-        if st.button("🔄 Refrescar noticias"):
-            st.cache_data.clear()  # limpia cache para forzar nueva lectura
+        traducir = st.sidebar.checkbox("Traducir al español", value=True)
 
         sn = StockNews(ticker, save_news=False)
         df_news = sn.read_rss()
@@ -220,22 +224,29 @@ elif pagina == "📰 Noticias":
         if df_news.empty:
             st.info("No se encontraron noticias recientes.")
         else:
-            for i in range(min(10, len(df_news))):
-                fecha = pd.to_datetime(df_news["published"].iloc[i], errors="coerce")
-                titulo = df_news["title"].iloc[i]
-                resumen = df_news["summary"].iloc[i]
+            # Convertir fechas
+            df_news["published"] = pd.to_datetime(df_news["published"], errors="coerce")
+            df_news = df_news[df_news["published"] >= pd.to_datetime(fecha_min)]
 
-                if traducir:
-                    try:
-                        titulo = GoogleTranslator(source="en", target="es").translate(titulo)
-                        resumen = GoogleTranslator(source="en", target="es").translate(resumen)
-                    except Exception:
-                        pass
+            if df_news.empty:
+                st.info("⚠️ No hay noticias para el rango de fechas seleccionado.")
+            else:
+                for i in range(min(10, len(df_news))):
+                    fecha = df_news["published"].iloc[i]
+                    titulo = df_news["title"].iloc[i]
+                    resumen = df_news["summary"].iloc[i]
 
-                st.subheader(titulo)
-                st.caption(f"Publicado: {fecha.date() if pd.notnull(fecha) else 'Fecha no disponible'}")
-                st.write(resumen)
-                st.markdown(f"""
-                - Sentimiento del título: {df_news['sentiment_title'].iloc[i]}  
-                - Sentimiento del resumen: {df_news['sentiment_summary'].iloc[i]}  
-                """)
+                    if traducir:
+                        try:
+                            titulo = GoogleTranslator(source="en", target="es").translate(titulo)
+                            resumen = GoogleTranslator(source="en", target="es").translate(resumen)
+                        except Exception:
+                            pass
+
+                    st.subheader(titulo)
+                    st.caption(f"Publicado: {fecha.date() if pd.notnull(fecha) else 'Fecha no disponible'}")
+                    st.write(resumen)
+                    st.markdown(f"""
+                    - Sentimiento del título: {df_news['sentiment_title'].iloc[i]}  
+                    - Sentimiento del resumen: {df_news['sentiment_summary'].iloc[i]}  
+                    """)
