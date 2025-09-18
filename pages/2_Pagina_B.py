@@ -2,12 +2,21 @@ import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import matplotlib.colors as mcolors
+import numpy as np
 
 # -------------------------
 # Config
 # -------------------------
 CAPITAL_TOTAL = 500_000_000  # 500 millones COP (fijo)
 DATA_FOLDER = "acciones"     # carpeta donde están los CSV de Yahoo
+
+# -------------------------
+# Función para generar paleta monocromática
+# -------------------------
+def generar_paleta(base_color, n):
+    cmap = mcolors.LinearSegmentedColormap.from_list("custom", ["#ffffff", base_color, "#000000"])
+    return [mcolors.to_hex(cmap(i)) for i in np.linspace(0.2, 0.8, n)]
 
 # -------------------------
 # Interfaz
@@ -104,8 +113,8 @@ if uploaded is not None:
                     # -------------------------
                     chart_type = st.radio("📊 Selecciona el tipo de gráfico:", ["Torta", "Barras"])
 
-                    # paleta corporativa sobria
-                    palette = ["#1f77b4", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b", "#17becf"]
+                    # generar paleta monocromática (ejemplo: azul corporativo #1f77b4)
+                    palette = generar_paleta("#1f77b4", len(df))
 
                     if chart_type == "Torta":
                         fig = px.pie(
@@ -114,6 +123,7 @@ if uploaded is not None:
                             values="Porcentaje",
                             title="Distribución del Portafolio (%)",
                             hole=0.3,
+                            color="Ticker",
                             color_discrete_sequence=palette
                         )
                         fig.update_traces(textinfo="percent+label", textfont_size=14, pull=[0.02]*len(df))
@@ -131,12 +141,14 @@ if uploaded is not None:
                         fig.update_traces(texttemplate="%{text:.2f}%", textposition="outside")
                         fig.update_layout(yaxis=dict(categoryorder="total ascending"))
 
+                    # Fondo oscuro elegante
                     fig.update_layout(
-                        title_font=dict(size=22, color="#2c3e50"),
+                        title_font=dict(size=22, color="white"),
                         legend_title="Acciones",
-                        legend=dict(font=dict(size=12, color="#2c3e50")),
-                        plot_bgcolor="white",
-                        paper_bgcolor="white"
+                        legend=dict(font=dict(size=12, color="white")),
+                        plot_bgcolor="#1e1e2f",   # gris oscuro
+                        paper_bgcolor="#1e1e2f",  # gris oscuro
+                        font=dict(color="white")
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
