@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # --- CONFIGURACIÓN INICIAL ---
-st.set_page_config(page_title="Mi Portafolio", layout="wide")
+#st.set_page_config(page_title="Mi Portafolio", layout="wide")
 
 # --- CAPITAL DISPONIBLE ---
 CAPITAL_TOTAL = 500_000_000  # 500 millones COP (fijo)
@@ -63,3 +63,4 @@ if archivo is not None:
         st.error(f"Error al procesar el archivo: {e}")
 else:
     st.warning("☝️ Por favor, sube un archivo CSV para continuar.")
+
