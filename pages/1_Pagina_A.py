@@ -7,7 +7,7 @@ import gdown
 import zipfile
 from stocknews import StockNews
 from deep_translator import GoogleTranslator
-from datetime import datetime
+import datetime
 
 # ==============================
 # CONFIGURACIÓN DE DATOS
@@ -206,17 +206,16 @@ elif pagina == "📰 Noticias":
     if ticker is None:
         st.warning("⚠️ Primero seleccione una empresa en la página de Análisis Histórico.")
     else:
-        st.title(f"📰 Noticias recientes de {ticker}")
+        st.title(f"📰 Noticias de {ticker}")
 
-        # Segmentador de fecha
-        col1, col2 = st.columns([2,1])
-        with col1:
-            fecha_min = st.date_input("📅 Ver noticias desde:", datetime(2020,1,1))
-        with col2:
-            if st.button("🔄 Refrescar noticias"):
-                st.cache_data.clear()  # limpia cache para forzar nueva lectura
-
+        # Opciones
         traducir = st.sidebar.checkbox("Traducir al español", value=True)
+
+        # Filtro de fecha mínimo
+        fecha_min = st.sidebar.date_input("📅 Mostrar noticias desde:", datetime.date(2020, 1, 1))
+
+        if st.button("🔄 Refrescar noticias"):
+            st.cache_data.clear()  # limpia cache para forzar nueva lectura
 
         sn = StockNews(ticker, save_news=False)
         df_news = sn.read_rss()
@@ -224,9 +223,12 @@ elif pagina == "📰 Noticias":
         if df_news.empty:
             st.info("No se encontraron noticias recientes.")
         else:
-            # Convertir fechas
-            df_news["published"] = pd.to_datetime(df_news["published"], errors="coerce")
-            df_news = df_news[df_news["published"] >= pd.to_datetime(fecha_min)]
+            # Convertir fechas a datetime sin timezone
+            df_news["published"] = pd.to_datetime(df_news["published"], errors="coerce").dt.tz_localize(None)
+            fecha_min = pd.to_datetime(fecha_min)
+
+            # Filtrar noticias por fecha mínima
+            df_news = df_news[df_news["published"] >= fecha_min]
 
             if df_news.empty:
                 st.info("⚠️ No hay noticias para el rango de fechas seleccionado.")
