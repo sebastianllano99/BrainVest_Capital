@@ -9,7 +9,9 @@ import zipfile
 from stocknews import StockNews
 from deep_translator import GoogleTranslator
 
-# ID del ZIP en Google Drive 
+# ==============================
+# CONFIGURACIÓN DE DATOS
+# ==============================
 ZIP_FILE_ID = "19R9zQNq5vmNuP3l2BMvN0V7rmNvegGas"
 CARPETA_DATOS = "acciones"
 ZIP_NAME = "acciones.zip"
@@ -22,194 +24,204 @@ def download_and_unzip():
     with zipfile.ZipFile(ZIP_NAME, "r") as zf:
         zf.extractall(CARPETA_DATOS)
 
-# Preparar datos
 if not os.path.exists(CARPETA_DATOS) or len(os.listdir(CARPETA_DATOS)) == 0:
     download_and_unzip()
 
-# Buscar CSV en toda la carpeta 
+# Buscar CSV en la carpeta
 archivos = []
 for root, _, files in os.walk(CARPETA_DATOS):
     for f in files:
         if f.endswith(".csv"):
             archivos.append(os.path.join(root, f))
 
-# Ordenar archivos por nombre para mantener consistencia
 archivos = sorted(archivos)
 
 if not archivos:
     st.error("No se encontraron archivos CSV en la carpeta.")
     st.stop()
 
-# Renombrar archivos ("EC_2023.csv" -> "EC")
+# Diccionario {ticker: ruta}
 tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 
-# Selección de ticker 
-st.title("Visualización de Históricos de Empresas")
-ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys()))
+# ==============================
+# NAVEGACIÓN
+# ==============================
+st.sidebar.title("📌 Navegación")
+pagina = st.sidebar.radio("Selecciona una página:", ["📊 Análisis Histórico", "📰 Noticias"])
 
-# Guardar selección en la sesión
-st.session_state["ticker"] = ticker
+# ==============================
+# PÁGINA DE ANÁLISIS HISTÓRICO
+# ==============================
+if pagina == "📊 Análisis Histórico":
+    st.title("📊 Visualización de Históricos de Empresas")
 
-ruta = tickers[ticker]
-df = pd.read_csv(ruta)
+    ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys()))
+    st.session_state["ticker"] = ticker  # guardamos selección para compartirla
 
-# Formateo de datos 
-df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-df = df.sort_values(by="Date")
+    ruta = tickers[ticker]
+    df = pd.read_csv(ruta)
 
-if "Return" not in df.columns:
-    df["Return"] = df["Adj Close"].pct_change() * 100
+    # Formateo
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df.sort_values(by="Date")
 
-df["Cumulative Return"] = (1 + df["Return"] / 100).cumprod() - 1
+    if "Return" not in df.columns:
+        df["Return"] = df["Adj Close"].pct_change() * 100
+    df["Cumulative Return"] = (1 + df["Return"] / 100).cumprod() - 1
 
-# Tabla 
-st.subheader(f"Datos históricos - {ticker}")
-st.dataframe(df, use_container_width=True, height=400)
+    # =======================
+    # Tabla
+    st.subheader(f"📑 Datos históricos - {ticker}")
+    st.dataframe(df, use_container_width=True, height=400)
 
-# Colores y estilos
-fondo = "#0d1b2a"
-texto = "#e0e1dd"
-verde = "#00ff7f"
-azul = "#1f77b4"
-rojo = "#ff4d4d"
-naranja = "#ff6f61"
+    # =======================
+    # Estilos de gráficos
+    fondo = "#0d1b2a"
+    texto = "#e0e1dd"
+    verde = "#00ff7f"
+    azul = "#1f77b4"
+    rojo = "#ff4d4d"
+    naranja = "#ff6f61"
 
-def rango_xaxis():
-    return dict(
-        rangeselector=dict(
-            buttons=list([
-                dict(count=1, label="1 mes", step="month", stepmode="backward"),
-                dict(count=6, label="6 meses", step="month", stepmode="backward"),
-                dict(count=1, label="1 año", step="year", stepmode="backward"),
-                dict(count=3, label="3 años", step="year", stepmode="backward"),
-                dict(step="all", label="Todo")
-            ]),
-            font=dict(color=texto),
-            bgcolor=fondo
-        ),
-        rangeslider=dict(visible=True),
-        tickformat="%d-%b-%Y",
-        color=texto
+    def rango_xaxis():
+        return dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1 mes", step="month", stepmode="backward"),
+                    dict(count=6, label="6 meses", step="month", stepmode="backward"),
+                    dict(count=1, label="1 año", step="year", stepmode="backward"),
+                    dict(count=3, label="3 años", step="year", stepmode="backward"),
+                    dict(step="all", label="Todo")
+                ]),
+                font=dict(color=texto),
+                bgcolor=fondo
+            ),
+            rangeslider=dict(visible=True),
+            tickformat="%d-%b-%Y",
+            color=texto
+        )
+
+    # =======================
+    # Gráfico Precio
+    st.subheader("💵 Evolución del Precio Ajustado (Adj Close)")
+    fig_price = px.line(
+        df, x="Date", y="Adj Close",
+        title=f"Evolución histórica de {ticker}",
+        labels={"Date": "Fecha", "Adj Close": "Precio Ajustado"},
+        template="plotly_dark"
     )
-
-# Gráfico Precio 
-st.subheader("Evolución del Precio Ajustado (Adj Close)")
-fig_price = px.line(
-    df, x="Date", y="Adj Close",
-    title=f"Evolución histórica de {ticker}",
-    labels={"Date": "Fecha", "Adj Close": "Precio Ajustado"},
-    template="plotly_dark"
-)
-fig_price.update_traces(line=dict(width=3, color=verde))
-fig_price.update_xaxes(**rango_xaxis())
-fig_price.update_layout(
-    height=500,
-    font=dict(size=15, family="Arial", color=texto),
-    hovermode="x unified",
-    plot_bgcolor=fondo,
-    paper_bgcolor=fondo,
-    title_font_color=verde
-)
-st.plotly_chart(fig_price, use_container_width=True)
-
-# Gráfico Volumen
-st.subheader("Volumen de Transacciones")
-opcion_vol = st.selectbox("Frecuencia del volumen", ["Diario", "Semanal", "Mensual"])
-df_vol = df.copy()
-if opcion_vol == "Semanal":
-    df_vol = df.resample("W", on="Date")["Volume"].sum().reset_index()
-elif opcion_vol == "Mensual":
-    df_vol = df.resample("M", on="Date")["Volume"].sum().reset_index()
-
-fig_vol = px.line(
-    df_vol, x="Date", y="Volume",
-    title=f"Volumen de transacciones ({opcion_vol}) - {ticker}",
-    labels={"Date": "Fecha", "Volume": "Acciones Negociadas"},
-    template="plotly_dark"
-)
-fig_vol.update_traces(line=dict(width=2.5, color=naranja))
-fig_vol.update_xaxes(**rango_xaxis())
-fig_vol.update_layout(
-    height=450,
-    font=dict(size=14, family="Arial", color=texto),
-    hovermode="x unified",
-    plot_bgcolor=fondo,
-    paper_bgcolor=fondo,
-    title_font_color=naranja
-)
-st.plotly_chart(fig_vol, use_container_width=True)
-
-# Gráfico Retornos 
-st.subheader("Retornos de la Acción")
-opcion_ret = st.selectbox("Frecuencia de retornos", ["Diario", "Semanal", "Mensual"])
-df_ret = df.copy()
-if opcion_ret == "Semanal":
-    df_ret = df.resample("W", on="Date").agg(
-        {"Return": "mean", "Cumulative Return": "last"}
-    ).reset_index()
-elif opcion_ret == "Mensual":
-    df_ret = df.resample("M", on="Date").agg(
-        {"Return": "mean", "Cumulative Return": "last"}
-    ).reset_index()
-
-fig_ret = go.Figure()
-fig_ret.add_trace(go.Scatter(
-    x=df_ret["Date"], y=df_ret["Return"],
-    mode="lines", name="Retorno (%)",
-    line=dict(color=verde, width=2), opacity=0.8
-))
-fig_ret.add_trace(go.Scatter(
-    x=df_ret["Date"], y=df_ret["Cumulative Return"] * 100,
-    mode="lines", name="Retorno Acumulado (%)",
-    line=dict(color=azul, width=3)
-))
-fig_ret.update_xaxes(**rango_xaxis())
-fig_ret.update_layout(
-    height=500,
-    xaxis_title="Fecha", yaxis_title="Retorno (%)",
-    template="plotly_dark",
-    font=dict(size=15, family="Arial", color=texto),
-    hovermode="x unified",
-    plot_bgcolor=fondo,
-    paper_bgcolor=fondo,
-    title=f"Retornos ({opcion_ret}) - {ticker}",
-    title_font_color=azul,
-    legend=dict(
-        orientation="h",
-        yanchor="bottom", y=1.02,
-        xanchor="right", x=1,
-        font=dict(size=13, color=texto)
+    fig_price.update_traces(line=dict(width=3, color=verde))
+    fig_price.update_xaxes(**rango_xaxis())
+    fig_price.update_layout(
+        height=500,
+        font=dict(size=15, family="Arial", color=texto),
+        hovermode="x unified",
+        plot_bgcolor=fondo,
+        paper_bgcolor=fondo,
+        title_font_color=verde
     )
-)
-st.plotly_chart(fig_ret, use_container_width=True)
+    st.plotly_chart(fig_price, use_container_width=True)
 
-# ------------------------
-# Noticias
-# ------------------------
-st.header("Noticias recientes")
-ticker = st.session_state.get("ticker", None)
+    # =======================
+    # Gráfico Volumen
+    st.subheader("📈 Volumen de Transacciones")
+    opcion_vol = st.selectbox("Frecuencia del volumen", ["Diario", "Semanal", "Mensual"])
+    df_vol = df.copy()
 
-# Controles en la barra lateral
-st.sidebar.header("Opciones de Noticias")
-fecha_inicio = st.sidebar.date_input("Mostrar noticias desde:", pd.to_datetime("2020-01-01"))
-traducir = st.sidebar.checkbox("Traducir al español", value=True)
-refrescar = st.sidebar.button("Refrescar noticias")
+    if opcion_vol == "Semanal":
+        df_vol = df.resample("W", on="Date")["Volume"].sum().reset_index()
+    elif opcion_vol == "Mensual":
+        df_vol = df.resample("M", on="Date")["Volume"].sum().reset_index()
 
-if ticker is None:
-    st.warning("Primero seleccione una empresa en la sección de históricos.")
-else:
-    if refrescar:
-        st.subheader(f"Últimas noticias de {ticker}")
+    fig_vol = px.line(
+        df_vol, x="Date", y="Volume",
+        title=f"Volumen de transacciones ({opcion_vol}) - {ticker}",
+        labels={"Date": "Fecha", "Volume": "Acciones Negociadas"},
+        template="plotly_dark"
+    )
+    fig_vol.update_traces(line=dict(width=2.5, color=naranja))
+    fig_vol.update_xaxes(**rango_xaxis())
+    fig_vol.update_layout(
+        height=450,
+        font=dict(size=14, family="Arial", color=texto),
+        hovermode="x unified",
+        plot_bgcolor=fondo,
+        paper_bgcolor=fondo,
+        title_font_color=naranja
+    )
+    st.plotly_chart(fig_vol, use_container_width=True)
+
+    # =======================
+    # Gráfico Retornos
+    st.subheader("📊 Retornos de la Acción")
+    opcion_ret = st.selectbox("Frecuencia de retornos", ["Diario", "Semanal", "Mensual"])
+    df_ret = df.copy()
+
+    if opcion_ret == "Semanal":
+        df_ret = df.resample("W", on="Date").agg(
+            {"Return": "mean", "Cumulative Return": "last"}
+        ).reset_index()
+    elif opcion_ret == "Mensual":
+        df_ret = df.resample("M", on="Date").agg(
+            {"Return": "mean", "Cumulative Return": "last"}
+        ).reset_index()
+
+    fig_ret = go.Figure()
+    fig_ret.add_trace(go.Scatter(
+        x=df_ret["Date"], y=df_ret["Return"],
+        mode="lines", name="Retorno (%)",
+        line=dict(color=verde, width=2), opacity=0.8
+    ))
+    fig_ret.add_trace(go.Scatter(
+        x=df_ret["Date"], y=df_ret["Cumulative Return"] * 100,
+        mode="lines", name="Retorno Acumulado (%)",
+        line=dict(color=azul, width=3)
+    ))
+    fig_ret.update_xaxes(**rango_xaxis())
+    fig_ret.update_layout(
+        height=500,
+        xaxis_title="Fecha", yaxis_title="Retorno (%)",
+        template="plotly_dark",
+        font=dict(size=15, family="Arial", color=texto),
+        hovermode="x unified",
+        plot_bgcolor=fondo,
+        paper_bgcolor=fondo,
+        title=f"Retornos ({opcion_ret}) - {ticker}",
+        title_font_color=azul,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="right", x=1,
+            font=dict(size=13, color=texto)
+        )
+    )
+    st.plotly_chart(fig_ret, use_container_width=True)
+
+# ==============================
+# PÁGINA DE NOTICIAS
+# ==============================
+elif pagina == "📰 Noticias":
+    ticker = st.session_state.get("ticker", None)
+
+    if ticker is None:
+        st.warning("⚠️ Primero seleccione una empresa en la página de Análisis Histórico.")
+    else:
+        st.title(f"📰 Noticias recientes de {ticker}")
+
+        # Opciones
+        traducir = st.sidebar.checkbox("Traducir al español", value=True)
+
+        if st.button("🔄 Refrescar noticias"):
+            st.cache_data.clear()  # limpia cache para forzar nueva lectura
+
         sn = StockNews(ticker, save_news=False)
         df_news = sn.read_rss()
-        df_news["published"] = pd.to_datetime(df_news["published"], errors="coerce")
-        df_news = df_news[df_news["published"] >= pd.to_datetime(fecha_inicio)]
 
         if df_news.empty:
-            st.warning("No se encontraron noticias en el rango seleccionado.")
+            st.info("No se encontraron noticias recientes.")
         else:
-            for i in range(len(df_news)):
-                fecha = df_news["published"].iloc[i]
+            for i in range(min(10, len(df_news))):
+                fecha = pd.to_datetime(df_news["published"].iloc[i], errors="coerce")
                 titulo = df_news["title"].iloc[i]
                 resumen = df_news["summary"].iloc[i]
 
@@ -221,7 +233,7 @@ else:
                         pass
 
                 st.subheader(titulo)
-                st.caption(f"Publicado: {fecha.date()}")
+                st.caption(f"Publicado: {fecha.date() if pd.notnull(fecha) else 'Fecha no disponible'}")
                 st.write(resumen)
                 st.markdown(f"""
                 - Sentimiento del título: {df_news['sentiment_title'].iloc[i]}  
