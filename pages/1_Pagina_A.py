@@ -48,7 +48,7 @@ tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 # NAVEGACIÓN
 # ==============================
 st.sidebar.title("📌 Navegación")
-#pagina = st.sidebar.radio("Selecciona una página:", ["📊 Análisis Histórico"]) para agregar subpaginas en caso de requerir 
+pagina = st.sidebar.radio("Selecciona una página:", ["📊 Análisis Histórico"])
 
 # ==============================
 # PÁGINA DE ANÁLISIS HISTÓRICO
@@ -76,7 +76,7 @@ if pagina == "📊 Análisis Histórico":
     st.dataframe(df, use_container_width=True, height=400)
 
     # =======================
-    # Gráficos
+    # Colores y estilo
     fondo = "#0d1b2a"
     texto = "#e0e1dd"
     verde = "#00ff7f"
@@ -101,6 +101,7 @@ if pagina == "📊 Análisis Histórico":
             color=texto
         )
 
+    # =======================
     # Precio
     st.subheader("💵 Evolución del Precio Ajustado (Adj Close)")
     fig_price = px.line(df, x="Date", y="Adj Close",
@@ -111,6 +112,7 @@ if pagina == "📊 Análisis Histórico":
     fig_price.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_price, use_container_width=True)
 
+    # =======================
     # Volumen
     st.subheader("📈 Volumen de Transacciones")
     opcion_vol = st.selectbox("Frecuencia del volumen", ["Diario", "Semanal", "Mensual"])
@@ -127,6 +129,7 @@ if pagina == "📊 Análisis Histórico":
     fig_vol.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_vol, use_container_width=True)
 
+    # =======================
     # Retornos
     st.subheader("📊 Retornos de la Acción")
     opcion_ret = st.selectbox("Frecuencia de retornos", ["Diario", "Semanal", "Mensual"])
@@ -146,8 +149,3 @@ if pagina == "📊 Análisis Histórico":
                                  line=dict(color=azul, width=3)))
     fig_ret.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_ret, use_container_width=True)
-
-
-
-
-
