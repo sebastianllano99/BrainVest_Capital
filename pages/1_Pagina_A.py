@@ -7,6 +7,7 @@ import gdown
 import zipfile
 import datetime
 import feedparser
+import urllib.parse
 from deep_translator import GoogleTranslator
 from textblob import TextBlob
 
@@ -164,53 +165,59 @@ elif pagina == "📰 Noticias":
         traducir = st.checkbox("Traducir al español", value=True)
 
         if st.button("🔍 Buscar noticias"):
-            query = f"{ticker} stock"
+            query = urllib.parse.quote(f"{ticker} stock")
             url = f"https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
-            feed = feedparser.parse(url)
+
+            try:
+                feed = feedparser.parse(url)
+            except Exception as e:
+                st.error(f"Error al consultar noticias: {e}")
+                feed = None
 
             noticias = []
-            for entry in feed.entries:
-                fecha = None
-                if hasattr(entry, "published"):
-                    try:
-                        fecha = pd.to_datetime(entry.published)
-                    except Exception:
-                        pass
-
-                if fecha is not None and fecha.year == year and fecha.month == month:
-                    titulo = entry.title
-                    desc = entry.summary if hasattr(entry, "summary") else "Sin resumen"
-                    link = entry.link
-
-                    if traducir:
+            if feed and hasattr(feed, "entries"):
+                for entry in feed.entries:
+                    fecha = None
+                    if hasattr(entry, "published"):
                         try:
-                            titulo = GoogleTranslator(source="en", target="es").translate(titulo)
-                            desc = GoogleTranslator(source="en", target="es").translate(desc)
+                            fecha = pd.to_datetime(entry.published)
                         except Exception:
                             pass
 
-                    # Sentimiento con TextBlob
-                    blob = TextBlob(desc)
-                    pol = blob.sentiment.polarity
-                    if pol > 0.1:
-                        sentimiento = "😊 Positivo"
-                    elif pol < -0.1:
-                        sentimiento = "😡 Negativo"
-                    else:
-                        sentimiento = "😐 Neutro"
+                    if fecha is not None and fecha.year == year and fecha.month == month:
+                        titulo = entry.title
+                        desc = entry.summary if hasattr(entry, "summary") else "Sin resumen"
+                        link = entry.link
 
-                    noticias.append({
-                        "titulo": titulo,
-                        "descripcion": desc,
-                        "fecha": fecha,
-                        "url": link,
-                        "sentimiento": sentimiento
-                    })
+                        if traducir:
+                            try:
+                                titulo = GoogleTranslator(source="en", target="es").translate(titulo)
+                                desc = GoogleTranslator(source="en", target="es").translate(desc)
+                            except Exception:
+                                pass
+
+                        # Sentimiento con TextBlob
+                        blob = TextBlob(desc)
+                        pol = blob.sentiment.polarity
+                        if pol > 0.1:
+                            sentimiento = "Positivo"
+                        elif pol < -0.1:
+                            sentimiento = "Negativo"
+                        else:
+                            sentimiento = "Neutro"
+
+                        noticias.append({
+                            "titulo": titulo,
+                            "descripcion": desc,
+                            "fecha": fecha,
+                            "url": link,
+                            "sentimiento": sentimiento
+                        })
 
             if not noticias:
                 st.info("⚠️ No se encontraron noticias para el rango seleccionado.")
             else:
-                for n in noticias[:10]:  # máximo 10 por mes
+                for n in noticias[:10]:  # máximo 10 por mes o año
                     st.subheader(n["titulo"])
                     st.caption(f"Publicado: {n['fecha'].date() if n['fecha'] is not None else 'Fecha no disponible'}")
                     st.write(n["descripcion"])
