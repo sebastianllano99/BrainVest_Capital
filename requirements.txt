@@ -4,6 +4,8 @@ plotly==5.24.1
 yfinance==0.2.43
 numpy==1.26.4
 scipy
+feedparser
+
 
 
 
