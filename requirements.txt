@@ -6,6 +6,7 @@ numpy==1.26.4
 scipy
 feedparser
 gdown
+matplotlib
 
 
 
