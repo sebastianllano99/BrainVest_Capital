@@ -6,15 +6,15 @@ from scipy.optimize import minimize
 import plotly.express as px
 
 # ==============================
-# Ocultar barra lateral en esta página
+# Configuración de página
 # ==============================
 st.set_page_config(page_title="Portafolio Óptimo", layout="wide", initial_sidebar_state="collapsed")
 
 st.title("📊 Optimización Automática de Portafolio - Markowitz")
-st.info("Analizando todas las acciones disponibles en la app...")
+st.info("Analizando todas las acciones disponibles en la app... Esto puede tardar unos segundos.")
 
 # ==============================
-# Definir tickers desde la carpeta de CSV
+# Carpeta de CSV
 # ==============================
 CARPETA_DATOS = "acciones"
 archivos = [os.path.join(root, f) for root, _, files in os.walk(CARPETA_DATOS) for f in files if f.endswith(".csv")]
@@ -24,20 +24,18 @@ if not archivos:
     st.error("No se encontraron archivos CSV en la carpeta.")
     st.stop()
 
-tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
-
 # ==============================
-# Construir DataFrame con precios de cierre ajustado
+# Construir DataFrame con precios ajustados (vectorizado)
 # ==============================
-# Lectura vectorizada para acelerar carga
-lista_df = []
-for ruta, t in tickers.items():
-    df_temp = pd.read_csv(ruta, usecols=["Date", "Adj Close"], parse_dates=["Date"])
-    df_temp = df_temp.rename(columns={"Adj Close": t})
-    lista_df.append(df_temp.set_index("Date"))
+with st.spinner("Cargando datos de todas las acciones..."):
+    lista_df = [
+        pd.read_csv(f, usecols=["Date","Adj Close"], parse_dates=["Date"])
+        .rename(columns={"Adj Close": os.path.basename(f).split("_")[0]})
+        .set_index("Date")
+        for f in archivos
+    ]
 
-df_all = pd.concat(lista_df, axis=1).sort_index()
-df_all = df_all.dropna()  # eliminar filas con datos faltantes
+    df_all = pd.concat(lista_df, axis=1).sort_index().dropna()
 
 # ==============================
 # Rendimientos logarítmicos
@@ -69,7 +67,8 @@ constraints = (
     {'type': 'eq', 'fun': checkSumToOne}
 )
 
-w_opt = minimize(riskFunction, w0, method='SLSQP', bounds=bounds, constraints=constraints)
+with st.spinner("Calculando portafolio óptimo..."):
+    w_opt = minimize(riskFunction, w0, method='SLSQP', bounds=bounds, constraints=constraints)
 
 if not w_opt.success:
     st.error("No se encontró una solución óptima. Intenta nuevamente.")
