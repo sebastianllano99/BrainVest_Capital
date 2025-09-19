@@ -7,6 +7,7 @@ import zipfile
 import datetime
 import feedparser
 import urllib.parse
+import gdown
 
 # CONFIGURACIÓN DE DATOS
 
@@ -136,5 +137,6 @@ if pagina == "Análisis Histórico":
                                  line=dict(color=azul, width=3)))
     fig_ret.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_ret, use_container_width=True)
+
 
 
