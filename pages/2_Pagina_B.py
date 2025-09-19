@@ -1,93 +1,156 @@
+import os
 import streamlit as st
 import os
 import pandas as pd
+import plotly.express as px
+import matplotlib.colors as mcolors
 import numpy as np
 from scipy.optimize import minimize
 import plotly.express as px
 
-# ==============================
-# NAV - agregar página Portafolio Óptimo
-# ==============================
-st.sidebar.title("📌 Navegación")
-pagina = st.sidebar.radio("Selecciona una página:", ["Análisis Histórico", "Portafolio Óptimo"])
+# Config
 
-# ==============================
-# PÁGINA DE PORTAFOLIO ÓPTIMO AUTOMÁTICO
-# ==============================
-if pagina == "Portafolio Óptimo":
-    st.title("📊 Optimización Automática de Portafolio - Markowitz")
+CAPITAL_TOTAL = 500_000_000  # 500 millones COP (fijo)
+DATA_FOLDER = "acciones"     # carpeta donde están los CSV de Yahoo
 
-    st.info("Analizando todas las acciones disponibles en la app... Esto puede tardar unos segundos según la cantidad de acciones.")
+# color
 
-    # Construir DataFrame con precios de cierre ajustado de todas las acciones
-    df_all = pd.DataFrame()
-    for t, ruta in tickers.items():
-        df_temp = pd.read_csv(ruta, parse_dates=["Date"])
-        df_temp = df_temp.sort_values("Date")
-        df_temp = df_temp.set_index("Date")
-        df_all[t] = df_temp["Adj Close"]
+def generar_paleta(base_color, n):
+    cmap = mcolors.LinearSegmentedColormap.from_list("custom", ["#ffffff", base_color, "#000000"])
+    return [mcolors.to_hex(cmap(i)) for i in np.linspace(0.2, 0.8, n)]
+# Interfaz de usuario en la pagina, incorporar a los titulos emoticones o diseños que llamen más la atencion en la pagina
 
-    df_all = df_all.dropna()  # eliminar filas con datos faltantes
+st.title(" Mi Portafolio de Inversión")
+st.info(f" El monto total disponible para invertir es **${CAPITAL_TOTAL:,.0f} COP** (fijo).")
+ 
+#incorporar emoticones o diseños que llamen más la atencion en la pagina
+st.warning(
+    """
+**Recuerda**: 
+- El CSV debe contener **dos columnas**: `Ticker` y `Porcentaje`.
+- El `Ticker` debe coincidir con los tickers de tus archivos en la carpeta `acciones/`.  
+  Ejemplo: si el archivo es `AAPL_2000-01-01_2024-12-31.csv`, el ticker válido es **AAPL**.
+- La suma de `Porcentaje` debe ser **100**.
+"""
+)
 
-    # Rendimientos logarítmicos
-    log_returns = np.log(df_all / df_all.shift(1)).dropna()
-    pBar = log_returns.mean()
-    Sigma = log_returns.cov()
+# Detectar tickers disponibles
 
-    # --- Funciones de optimización ---
-    def riskFunction(w):
-        return np.dot(w.T, np.dot(Sigma, w))
+available_tickers = set()
+if os.path.isdir(DATA_FOLDER):
+    for root, _, files in os.walk(DATA_FOLDER):
+        for f in files:
+            if f.lower().endswith(".csv"):
+                ticker = os.path.basename(f).split("_")[0].upper()
+                available_tickers.add(ticker)
+else:
+    st.info(f"Nota: la carpeta `{DATA_FOLDER}` no se encontró. La validación automática de tickers será omitida.") #incorporar emoticones o diseños que llamen más la atencion en la pagina
 
-    def checkMinimumReturn(w):
-        return np.sum(pBar * w) - 0.02  # retorno mínimo requerido
+# Botón para descargar CSV ejemplo
 
-    def checkSumToOne(w):
-        return np.sum(w) - 1
+if available_tickers:
+    sample_tickers = list(available_tickers)[:4]
+else:
+    sample_tickers = ["AAPL", "MSFT", "GOOG", "AMZN"]
 
-    # Optimización
-    n_assets = len(pBar)
-    w0 = np.ones(n_assets) / n_assets
-    bounds = [(0, 1)] * n_assets
-    constraints = (
-        {'type': 'eq', 'fun': checkMinimumReturn},
-        {'type': 'eq', 'fun': checkSumToOne}
-    )
+sample_df = pd.DataFrame({"Ticker": sample_tickers, "Porcentaje": [40, 30, 20, 10]})
+st.download_button(
+    label="⬇Descargar CSV de ejemplo", #incorporar emoticones o diseños que llamen más la atencion en la pagina
+    data=sample_df.to_csv(index=False).encode("utf-8"),
+    file_name="ejemplo_portafolio.csv",
+    mime="text/csv",
+)
 
-    w_opt = minimize(riskFunction, w0, method='SLSQP', bounds=bounds, constraints=constraints)
+st.markdown("---")
 
-    if not w_opt.success:
-        st.error("No se encontró una solución óptima. Intenta nuevamente.")
-        st.stop()
 
-    # Resultados
-    w_scipy = w_opt.x
-    risk_scipy = riskFunction(w_scipy)
-    expected_return = np.sum(pBar * w_scipy)
+# Subida del archivo CSV
 
-    # Mostrar solo las acciones con peso > 0%
-    resultados = pd.DataFrame({
-        "Acción": df_all.columns,
-        "Peso Óptimo": w_scipy
-    })
-    resultados = resultados[resultados["Peso Óptimo"] > 0.001]  # filtrar muy pequeños
-    resultados["Peso Óptimo (%)"] = resultados["Peso Óptimo"] * 100
+uploaded = st.file_uploader(" Sube tu archivo CSV (Ticker, Porcentaje)", type=["csv"])#incorporar emoticones o diseños que llamen más la atencion en la pagina
 
-    st.subheader("📌 Portafolio Óptimo - Pesos de Acciones")
-    st.dataframe(resultados.sort_values("Peso Óptimo (%)", ascending=False), use_container_width=True)
+if uploaded is not None:
+    try:
+        df = pd.read_csv(uploaded)
+        # normalizar nombres de columnas
+        cols_map = {c.lower().strip(): c for c in df.columns}
+        if "ticker" not in cols_map or "porcentaje" not in cols_map:
+            st.error("El CSV debe contener las columnas `Ticker` y `Porcentaje`.")#incorporar emoticones o diseños que llamen más la atencion en la pagina
+        else:
+            df = df.rename(columns={cols_map["ticker"]: "Ticker", cols_map["porcentaje"]: "Porcentaje"})
+            df["Ticker"] = df["Ticker"].astype(str).str.strip().str.upper()
+            df["Porcentaje"] = pd.to_numeric(df["Porcentaje"], errors="coerce")
 
-    st.write(f"📈 Retorno esperado: **{expected_return:.2%}**")
-    st.write(f"⚖️ Riesgo (varianza): **{risk_scipy:.4f}**")
+            if df["Porcentaje"].isnull().any():
+                st.error(" Hay valores no numéricos en la columna `Porcentaje`.")#incorporar emoticones o diseños que llamen más la atencion en la pagina
+            else:
+                suma_pct = df["Porcentaje"].sum()
+                if abs(suma_pct - 100) > 0.01:
+                    st.error(f" Los porcentajes deben sumar 100. Actualmente suman {suma_pct:.6f}.")#incorporar emoticones o diseños que llamen más la atencion en la pagina
+                else:
+                    if available_tickers:
+                        missing = [t for t in df["Ticker"] if t not in available_tickers]
+                        if missing:
+                            st.error(
+                                " Algunos tickers del CSV no se encontraron en la carpeta 'acciones':\n\n"
+                                + ", ".join(missing)
+                            )
+                            st.stop()
+#incorporar emoticones o diseños que llamen más la atencion en la pagina
+                    # calcular montos
+                    df["Inversion (COP)"] = (df["Porcentaje"] / 100.0 * CAPITAL_TOTAL).round(0).astype(int)
 
-    # ----------------------------
-    # Gráfico de pastel con Plotly
-    # ----------------------------
-    st.subheader("📊 Distribución del Portafolio")
-    fig_pie = px.pie(resultados.sort_values("Peso Óptimo (%)", ascending=False),
-                     names="Acción",
-                     values="Peso Óptimo (%)",
-                     title="Composición del Portafolio Óptimo",
-                     color_discrete_sequence=px.colors.qualitative.Dark24)
+                    st.subheader(" Distribución del Portafolio")
+                    st.dataframe(df, use_container_width=True)
 
-    fig_pie.update_traces(textinfo="label+percent", pull=[0.05]*len(resultados))
-    fig_pie.update_layout(showlegend=True)
-    st.plotly_chart(fig_pie, use_container_width=True)
+                    total_invertido = int(df["Inversion (COP)"].sum())
+                    st.success(f"Portafolio válido. Total invertido: {total_invertido:,.0f} COP")
+
+
+                    # Selector de gráfico
+                 #incorporar emoticones o diseños que llamen más la atencion en la pagina
+                    chart_type = st.radio(" Selecciona el tipo de gráfico:", ["Torta", "Barras"])
+
+                    # paleta color
+                    palette = generar_paleta("#1f77b4", len(df))
+
+                    if chart_type == "Torta":
+                        fig = px.pie(
+                            df,
+                            names="Ticker",
+                            values="Porcentaje",
+                            title="Distribución del Portafolio (%)",#incorporar emoticones o diseños que llamen más la atencion en la pagina
+                            hole=0.3,
+                            color="Ticker",
+                            color_discrete_sequence=palette
+                        )
+                        fig.update_traces(textinfo="percent+label", textfont_size=14, pull=[0.02]*len(df))
+                    else:
+                        fig = px.bar(
+                            df,
+                            x="Porcentaje",
+                            y="Ticker",
+                            orientation="h",
+                            text="Porcentaje",
+                            title="Distribución del Portafolio (%)",#incorporar emoticones o diseños que llamen más la atencion en la pagina
+                            color="Ticker",
+                            color_discrete_sequence=palette
+                        )
+                        fig.update_traces(texttemplate="%{text:.2f}%", textposition="outside")
+                        fig.update_layout(yaxis=dict(categoryorder="total ascending"))
+
+                    # Fondo 
+                    fig.update_layout(
+                        title_font=dict(size=22, color="white"),
+                        legend_title="Acciones", #incorporar emoticones o diseños que llamen más la atencion en la pagina
+                        legend=dict(font=dict(size=12, color="white")),
+                        plot_bgcolor="#1e1e2f",   # gris oscuro
+                        paper_bgcolor="#1e1e2f",  # gris oscuro
+                        font=dict(color="white")
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Error al procesar el archivo: {e}")
+else:
+    st.info("Sube un CSV para ver la distribución.")
+#incorporar emoticones o diseños que llamen más la atencion en la pagina
