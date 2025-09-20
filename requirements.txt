@@ -7,6 +7,7 @@ scipy
 feedparser
 gdown
 matplotlib
+openpyxl
 
 
 
