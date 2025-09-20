@@ -90,8 +90,7 @@ else:
         page_path = os.path.join(BASE_DIR, "pages", "2_Pagina_B.py")
     elif st.session_state["current_page"] == "pagina_c":
         page_path = os.path.join(BASE_DIR, "pages", "3_Pagina_C.py")
-    elif st.session_state["current_page"] == "pagina_d":
-        page_path = os.path.join(BASE_DIR, "pages", "4_Pagina_D.py")
+ 
 
     # Cargar la página seleccionada
     if st.session_state["current_page"] != "home":
@@ -102,6 +101,7 @@ else:
             pagina = importlib.util.module_from_spec(spec)
             sys.modules["pagina"] = pagina
             spec.loader.exec_module(pagina)
+
 
 
 
