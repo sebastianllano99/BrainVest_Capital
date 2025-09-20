@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Portafolio Óptimo", layout="wide")
+#st.set_page_config(page_title="Portafolio Óptimo", layout="wide")
 st.title("📊 Análisis de Portafolios")
 
 # --- ID de la hoja de Google Sheets ---
@@ -185,5 +185,6 @@ st.markdown("""
     div[data-baseweb="select"] span { color: #00CFFF !important; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
+
 
 
