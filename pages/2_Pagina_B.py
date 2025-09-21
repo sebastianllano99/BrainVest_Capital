@@ -28,6 +28,7 @@ for root, _, files in os.walk(CARPETA_DATOS):
     for f in files:
         if f.endswith(".csv"):
             archivos.append(os.path.join(root, f))
+
 archivos = sorted(archivos)
 
 if not archivos:
@@ -87,121 +88,131 @@ if uploaded_file is not None:
     # BOTÓN PARA SIMULACIÓN
     # =====================
     if st.button("🚀 Iniciar Simulación"):
-        precios = pd.DataFrame()
 
-        # Leer históricos de los tickers seleccionados
-        for t in tickers_equipo:
-            if t in tickers:
-                df_hist = pd.read_csv(tickers[t], parse_dates=["Date"], index_col="Date")
-                precios[t] = df_hist["Adj Close"]
-            else:
-                st.warning(f"No se encontró histórico para {t}")
+        # ------------------------
+        # Cálculo de frontera eficiente real (toda la base de datos)
+        # ------------------------
+        precios_all = pd.DataFrame()
+        for t in tickers.keys():
+            df_hist = pd.read_csv(tickers[t], parse_dates=["Date"], index_col="Date")
+            precios_all[t] = df_hist["Adj Close"]
 
-        if precios.empty:
-            st.error("No se encontraron datos históricos para los tickers seleccionados.")
-            st.stop()
+        returns_all = np.log(precios_all / precios_all.shift(1)).dropna()
+        pBar_all = returns_all.mean()
+        Sigma_all = returns_all.cov()
+        n_assets_all = len(pBar_all)
 
-        # =====================
-        # Cálculo de retornos diarios
-        # =====================
-        returns = np.log(precios / precios.shift(1)).dropna()
-        pBar = returns.mean()
-        Sigma = returns.cov()
-        n_assets = len(pBar)
-
-        # =====================
-        # Funciones Markowitz
-        # =====================
-        def portfolio_return(weights):
+        def portfolio_return(weights, pBar=pBar_all):
             return np.sum(pBar * weights)
 
-        def portfolio_volatility(weights):
+        def portfolio_volatility(weights, Sigma=Sigma_all):
             return np.sqrt(np.dot(weights.T, np.dot(Sigma, weights)))
 
-        # =====================
-        # Funciones para anualizar
-        # =====================
-        TRADING_DAYS = 252
-
-        def annualized_return(weights):
-            daily_ret = portfolio_return(weights)
-            return (1 + daily_ret)**TRADING_DAYS - 1
-
-        def annualized_volatility(weights):
-            daily_vol = portfolio_volatility(weights)
-            return daily_vol * np.sqrt(TRADING_DAYS)
-
-        # =====================
-        # Optimización
-        # =====================
-        def minimize_volatility(target_return):
-            w0 = np.ones(n_assets)/n_assets
-            bounds = [(0,1)]*n_assets
+        def minimize_volatility_all(target_return):
+            w0 = np.ones(n_assets_all)/n_assets_all
+            bounds = [(0,1)]*n_assets_all
             constraints = (
                 {'type':'eq','fun': lambda w: portfolio_return(w)-target_return},
                 {'type':'eq','fun': lambda w: np.sum(w)-1}
             )
             return minimize(portfolio_volatility, w0, method="SLSQP", bounds=bounds, constraints=constraints)
 
-        # Frontera eficiente
-        frontier_volatility, frontier_returns = [], []
-        target_returns = np.linspace(pBar.min(), pBar.max(), 30)
-        for r in target_returns:
-            opt = minimize_volatility(r)
+        frontier_volatility_all, frontier_returns_all = [], []
+        target_returns_all = np.linspace(pBar_all.min(), pBar_all.max(), 30)
+        for r in target_returns_all:
+            opt = minimize_volatility_all(r)
             if opt.success:
-                frontier_volatility.append(annualized_volatility(opt.x))
-                frontier_returns.append(annualized_return(opt.x))
+                frontier_volatility_all.append(portfolio_volatility(opt.x))
+                frontier_returns_all.append(portfolio_return(opt.x))
 
-        # Portafolio de mínima varianza (GMVP)
-        def global_min_variance():
-            w0 = np.ones(n_assets)/n_assets
-            bounds = [(0,1)]*n_assets
+        # ------------------------
+        # Cálculo del portafolio del jugador
+        # ------------------------
+        precios_player = pd.DataFrame()
+        for t in tickers_equipo:
+            if t in tickers:
+                df_hist = pd.read_csv(tickers[t], parse_dates=["Date"], index_col="Date")
+                precios_player[t] = df_hist["Adj Close"]
+            else:
+                st.warning(f"No se encontró histórico para {t}")
+
+        if precios_player.empty:
+            st.error("No se encontraron datos históricos para los tickers seleccionados.")
+            st.stop()
+
+        returns_player = np.log(precios_player / precios_player.shift(1)).dropna()
+        pBar_player = returns_player.mean()
+        Sigma_player = returns_player.cov()
+        n_assets_player = len(pBar_player)
+
+        # Funciones
+        def portfolio_return_player(weights):
+            return np.sum(pBar_player * weights)
+
+        def portfolio_volatility_player(weights):
+            return np.sqrt(np.dot(weights.T, np.dot(Sigma_player, weights)))
+
+        # GMVP jugador
+        def global_min_variance_player():
+            w0 = np.ones(n_assets_player)/n_assets_player
+            bounds = [(0,1)]*n_assets_player
             constraints = ({'type':'eq','fun': lambda w: np.sum(w)-1})
-            return minimize(portfolio_volatility, w0, method="SLSQP", bounds=bounds, constraints=constraints)
+            return minimize(portfolio_volatility_player, w0, method="SLSQP", bounds=bounds, constraints=constraints)
 
-        gmv = global_min_variance()
+        gmv_player = global_min_variance_player()
 
-        # Portafolio de máxima razón de Sharpe
+        # Max Sharpe jugador
         risk_free = 0.0
-        def negative_sharpe(weights):
-            ret = annualized_return(weights)
-            vol = annualized_volatility(weights)
+        def negative_sharpe_player(weights):
+            ret = portfolio_return_player(weights)
+            vol = portfolio_volatility_player(weights)
             return -(ret-risk_free)/vol
 
-        def max_sharpe():
-            w0 = np.ones(n_assets)/n_assets
-            bounds = [(0,1)]*n_assets
+        def max_sharpe_player():
+            w0 = np.ones(n_assets_player)/n_assets_player
+            bounds = [(0,1)]*n_assets_player
             constraints = ({'type':'eq','fun': lambda w: np.sum(w)-1})
-            return minimize(negative_sharpe, w0, method="SLSQP", bounds=bounds, constraints=constraints)
+            return minimize(negative_sharpe_player, w0, method="SLSQP", bounds=bounds, constraints=constraints)
 
-        ms = max_sharpe()
+        ms_player = max_sharpe_player()
 
         # =====================
-        # Mostrar Resultados
+        # Mostrar resultados
         # =====================
-        st.subheader("📈 Resultados de la Simulación")
-
+        st.subheader("📈 Resultados del Portafolio del Jugador (Anualizados)")
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("**Portafolio de Mínima Varianza (GMVP):**")
-            st.write("Pesos:", dict(zip(pBar.index, np.round(gmv.x, 3))))
-            st.write("Retorno anual esperado:", round(annualized_return(gmv.x)*100, 2), "%")
-            st.write("Volatilidad anual:", round(annualized_volatility(gmv.x)*100, 2), "%")
+            st.markdown("**GMVP Jugador**")
+            st.write("Pesos:", dict(zip(pBar_player.index, np.round(gmv_player.x, 3))))
+            st.write("Retorno esperado anual:", round(portfolio_return_player(gmv_player.x)*252*100,2), "%")
+            st.write("Volatilidad anual:", round(portfolio_volatility_player(gmv_player.x)*np.sqrt(252)*100,2), "%")
 
         with col2:
-            st.markdown("**Portafolio de Máxima Razón de Sharpe:**")
-            st.write("Pesos:", dict(zip(pBar.index, np.round(ms.x, 3))))
-            st.write("Retorno anual esperado:", round(annualized_return(ms.x)*100, 2), "%")
-            st.write("Volatilidad anual:", round(annualized_volatility(ms.x)*100, 2), "%")
+            st.markdown("**Max Sharpe Jugador**")
+            st.write("Pesos:", dict(zip(pBar_player.index, np.round(ms_player.x, 3))))
+            st.write("Retorno esperado anual:", round(portfolio_return_player(ms_player.x)*252*100,2), "%")
+            st.write("Volatilidad anual:", round(portfolio_volatility_player(ms_player.x)*np.sqrt(252)*100,2), "%")
 
         # =====================
-        # Gráfico Frontera Eficiente
+        # Gráfico comparativo
         # =====================
-        st.subheader("📊 Frontera Eficiente")
+        st.subheader("📊 Comparativa con Frontera Eficiente Real")
         fig, ax = plt.subplots(figsize=(8,5))
-        ax.plot(frontier_volatility, frontier_returns, 'b--', label="Frontera Eficiente")
-        ax.scatter(annualized_volatility(gmv.x), annualized_return(gmv.x), c="red", marker="o", s=80, label="GMVP")
-        ax.scatter(annualized_volatility(ms.x), annualized_return(ms.x), c="green", marker="*", s=120, label="Max Sharpe")
+
+        # Frontera eficiente real
+        ax.plot(np.array(frontier_volatility_all)*np.sqrt(252), np.array(frontier_returns_all)*252, 
+                'b--', label="Frontera Eficiente Real")
+
+        # GMVP jugador
+        ax.scatter(portfolio_volatility_player(gmv_player.x)*np.sqrt(252), 
+                   portfolio_return_player(gmv_player.x)*252, 
+                   c="red", marker="o", s=80, label="GMVP Jugador")
+
+        # Max Sharpe jugador
+        ax.scatter(portfolio_volatility_player(ms_player.x)*np.sqrt(252), 
+                   portfolio_return_player(ms_player.x)*252, 
+                   c="green", marker="*", s=120, label="Max Sharpe Jugador")
+
         ax.set_xlabel("Volatilidad Anual")
         ax.set_ylabel("Retorno Anual Esperado")
         ax.legend()
