@@ -103,8 +103,9 @@ if uploaded_file is not None:
             st.stop()
 
         # =====================
-        # Cálculo de retornos
+        # Cálculo de retornos diarios y anualización
         # =====================
+        TRADING_DAYS = 252  # días de trading por año
         returns = np.log(precios / precios.shift(1)).dropna()
         pBar = returns.mean()
         Sigma = returns.cov()
@@ -134,8 +135,8 @@ if uploaded_file is not None:
         for r in target_returns:
             opt = minimize_volatility(r)
             if opt.success:
-                frontier_volatility.append(portfolio_volatility(opt.x))
-                frontier_returns.append(portfolio_return(opt.x))
+                frontier_volatility.append(portfolio_volatility(opt.x) * np.sqrt(TRADING_DAYS))
+                frontier_returns.append(portfolio_return(opt.x) * TRADING_DAYS)
 
         # Portafolio de mínima varianza (GMVP)
         def global_min_variance():
@@ -149,9 +150,9 @@ if uploaded_file is not None:
         # Portafolio de máxima razón de Sharpe
         risk_free = 0.0
         def negative_sharpe(weights):
-            ret = portfolio_return(weights)
-            vol = portfolio_volatility(weights)
-            return -(ret-risk_free)/vol
+            ret = portfolio_return(weights) * TRADING_DAYS
+            vol = portfolio_volatility(weights) * np.sqrt(TRADING_DAYS)
+            return -(ret - risk_free) / vol
 
         def max_sharpe():
             w0 = np.ones(n_assets)/n_assets
@@ -162,22 +163,22 @@ if uploaded_file is not None:
         ms = max_sharpe()
 
         # =====================
-        # Mostrar Resultados
+        # Mostrar Resultados Anualizados
         # =====================
-        st.subheader("📈 Resultados de la Simulación")
+        st.subheader("📈 Resultados de la Simulación (Anualizados)")
 
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**Portafolio de Mínima Varianza (GMVP):**")
             st.write("Pesos:", dict(zip(pBar.index, np.round(gmv.x, 3))))
-            st.write("Retorno esperado:", round(portfolio_return(gmv.x)*100, 2), "%")
-            st.write("Volatilidad:", round(portfolio_volatility(gmv.x)*100, 2), "%")
+            st.write("Retorno esperado anual:", round(portfolio_return(gmv.x)*TRADING_DAYS*100, 2), "%")
+            st.write("Volatilidad anual:", round(portfolio_volatility(gmv.x)*np.sqrt(TRADING_DAYS)*100, 2), "%")
 
         with col2:
             st.markdown("**Portafolio de Máxima Razón de Sharpe:**")
             st.write("Pesos:", dict(zip(pBar.index, np.round(ms.x, 3))))
-            st.write("Retorno esperado:", round(portfolio_return(ms.x)*100, 2), "%")
-            st.write("Volatilidad:", round(portfolio_volatility(ms.x)*100, 2), "%")
+            st.write("Retorno esperado anual:", round(portfolio_return(ms.x)*TRADING_DAYS*100, 2), "%")
+            st.write("Volatilidad anual:", round(portfolio_volatility(ms.x)*np.sqrt(TRADING_DAYS)*100, 2), "%")
 
         # =====================
         # Gráfico Frontera Eficiente
@@ -185,10 +186,10 @@ if uploaded_file is not None:
         st.subheader("📊 Frontera Eficiente")
         fig, ax = plt.subplots(figsize=(8,5))
         ax.plot(frontier_volatility, frontier_returns, 'b--', label="Frontera Eficiente")
-        ax.scatter(portfolio_volatility(gmv.x), portfolio_return(gmv.x), c="red", marker="o", s=80, label="GMVP")
-        ax.scatter(portfolio_volatility(ms.x), portfolio_return(ms.x), c="green", marker="*", s=120, label="Max Sharpe")
-        ax.set_xlabel("Volatilidad (Riesgo)")
-        ax.set_ylabel("Retorno Esperado")
+        ax.scatter(portfolio_volatility(gmv.x)*np.sqrt(TRADING_DAYS), portfolio_return(gmv.x)*TRADING_DAYS, c="red", marker="o", s=80, label="GMVP")
+        ax.scatter(portfolio_volatility(ms.x)*np.sqrt(TRADING_DAYS), portfolio_return(ms.x)*TRADING_DAYS, c="green", marker="*", s=120, label="Max Sharpe")
+        ax.set_xlabel("Volatilidad Anual")
+        ax.set_ylabel("Retorno Esperado Anual")
         ax.legend()
         st.pyplot(fig)
 
