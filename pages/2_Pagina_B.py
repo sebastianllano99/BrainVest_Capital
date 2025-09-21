@@ -1,183 +1,177 @@
-import os
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import matplotlib.colors as mcolors
 import numpy as np
+import os, zipfile, gdown
+import matplotlib.pyplot as plt
+from scipy.optimize import minimize
 
-# -------------------------
-# Config
-# -------------------------
-CAPITAL_TOTAL = 500_000_000  # 500 millones COP (fijo)
-DATA_FOLDER = "acciones"     # carpeta donde están los CSV de Yahoo
+# =========================
+# CONFIGURACIÓN DE DATOS
+# =========================
+ZIP_FILE_ID = "19R9zQNq5vmNuP3l2BMvN0V7rmNvegGas"
+CARPETA_DATOS = "acciones"
+ZIP_NAME = "acciones.zip"
 
-# -------------------------
-# Función para generar paleta monocromática
-# -------------------------
-def generar_paleta(base_color, n):
-    cmap = mcolors.LinearSegmentedColormap.from_list("custom", ["#ffffff", base_color, "#000000"])
-    return [mcolors.to_hex(cmap(i)) for i in np.linspace(0.2, 0.8, n)]
+def download_and_unzip():
+    url = f"https://drive.google.com/uc?export=download&id={ZIP_FILE_ID}"
+    st.info("Descargando base de datos desde Google Drive, por favor espera...")
+    gdown.download(url, ZIP_NAME, quiet=False)
+    with zipfile.ZipFile(ZIP_NAME, "r") as zf:
+        zf.extractall(CARPETA_DATOS)
 
-# -------------------------
-# Interfaz
-# -------------------------
-st.title("📊 Mi Portafolio de Inversión")
-st.info(f"💰 El monto total disponible para invertir es **${CAPITAL_TOTAL:,.0f} COP** (fijo).")
+if not os.path.exists(CARPETA_DATOS) or len(os.listdir(CARPETA_DATOS)) == 0:
+    download_and_unzip()
 
-st.warning(
-    """
-🔔 **Recuerda**:
-- El CSV debe contener **dos columnas**: `Ticker` y `Porcentaje`.
-- El `Ticker` debe coincidir con los tickers de tus archivos en la carpeta `acciones/`.  
-  Ejemplo: si el archivo es `AAPL_2000-01-01_2024-12-31.csv`, el ticker válido es **AAPL**.
-- La suma de `Porcentaje` debe ser **100**.
-"""
-)
+# Buscar CSV en la carpeta de históricos
+archivos = []
+for root, _, files in os.walk(CARPETA_DATOS):
+    for f in files:
+        if f.endswith(".csv"):
+            archivos.append(os.path.join(root, f))
 
-# -------------------------
-# Detectar tickers disponibles
-# -------------------------
-available_tickers = set()
-if os.path.isdir(DATA_FOLDER):
-    for root, _, files in os.walk(DATA_FOLDER):
-        for f in files:
-            if f.lower().endswith(".csv"):
-                ticker = os.path.basename(f).split("_")[0].upper()
-                available_tickers.add(ticker)
-else:
-    st.info(f"Nota: la carpeta `{DATA_FOLDER}` no se encontró. La validación automática de tickers será omitida.")
+archivos = sorted(archivos)
 
-# -------------------------
-# Botón para descargar CSV ejemplo
-# -------------------------
-if available_tickers:
-    sample_tickers = list(available_tickers)[:4]
-else:
-    sample_tickers = ["AAPL", "MSFT", "GOOG", "AMZN"]
+if not archivos:
+    st.error("No se encontraron archivos CSV en la carpeta de históricos.")
+    st.stop()
 
-sample_df = pd.DataFrame({"Ticker": sample_tickers, "Porcentaje": [40, 30, 20, 10]})
-st.download_button(
-    label="⬇️ Descargar CSV de ejemplo",
-    data=sample_df.to_csv(index=False).encode("utf-8"),
-    file_name="ejemplo_portafolio.csv",
-    mime="text/csv",
-)
+# Diccionario {ticker: ruta al csv}
+tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 
-st.markdown("---")
+# =========================
+# INTERFAZ DE PÁGINA 2
+# =========================
+st.title("📊 Simulación de Portafolios con Markowitz")
+st.write("Sube el archivo CSV con la selección de tu equipo. El sistema calculará el portafolio óptimo usando los datos históricos.")
 
-# -------------------------
-# Subida del CSV
-# -------------------------
-uploaded = st.file_uploader("📂 Sube tu archivo CSV (Ticker, Porcentaje)", type=["csv"])
+uploaded_file = st.file_uploader("📂 Sube el archivo CSV de tu equipo", type=["csv"])
 
-if uploaded is not None:
-    try:
-        df = pd.read_csv(uploaded)
+if uploaded_file is not None:
+    df_equipo = pd.read_csv(uploaded_file)
+    st.success("✅ Archivo cargado correctamente.")
+    st.write("Vista previa de tu selección:")
+    st.dataframe(df_equipo.head())
 
-        # normalizar nombres de columnas
-        cols_map = {c.lower().strip(): c for c in df.columns}
-        if "ticker" not in cols_map or "porcentaje" not in cols_map:
-            st.error("❌ El CSV debe contener las columnas `Ticker` y `Porcentaje`.")
-        else:
-            df = df.rename(columns={cols_map["ticker"]: "Ticker", cols_map["porcentaje"]: "Porcentaje"})
-            df["Ticker"] = df["Ticker"].astype(str).str.strip().str.upper()
-            df["Porcentaje"] = pd.to_numeric(df["Porcentaje"], errors="coerce")
+    # Extraer tickers seleccionados en el CSV del equipo
+    if "Ticker" not in df_equipo.columns:
+        st.error("El CSV debe contener una columna llamada 'Ticker'.")
+        st.stop()
 
-            if df["Porcentaje"].isnull().any():
-                st.error("❌ Hay valores no numéricos en la columna `Porcentaje`.")
+    tickers_equipo = df_equipo["Ticker"].unique().tolist()
+    st.info(f"Tu equipo seleccionó los siguientes activos: {', '.join(tickers_equipo)}")
+
+    # =====================
+    # BOTÓN PARA SIMULACIÓN
+    # =====================
+    if st.button("🚀 Iniciar Simulación"):
+        precios = pd.DataFrame()
+
+        # Leer históricos de los tickers seleccionados
+        for t in tickers_equipo:
+            if t in tickers:
+                df_hist = pd.read_csv(tickers[t], parse_dates=["Date"], index_col="Date")
+                precios[t] = df_hist["Adj Close"]
             else:
-                suma_pct = df["Porcentaje"].sum()
-                if abs(suma_pct - 100) > 0.01:
-                    st.error(f"❌ Los porcentajes deben sumar 100. Actualmente suman {suma_pct:.6f}.")
-                else:
-                    if available_tickers:
-                        missing = [t for t in df["Ticker"] if t not in available_tickers]
-                        if missing:
-                            st.error(
-                                "❌ Algunos tickers del CSV no se encontraron en la carpeta 'acciones':\n\n"
-                                + ", ".join(missing)
-                            )
-                            st.stop()
+                st.warning(f"No se encontró histórico para {t}")
 
-                    # calcular montos
-                    df["Inversion (COP)"] = (df["Porcentaje"] / 100.0 * CAPITAL_TOTAL).round(0).astype(int)
+        # Verificar que haya datos
+        if precios.empty:
+            st.error("No se encontraron datos históricos para los tickers seleccionados.")
+            st.stop()
 
-                    st.subheader("📋 Distribución del Portafolio")
-                    st.dataframe(df, use_container_width=True)
+        # =====================
+        # Cálculo de retornos
+        # =====================
+        returns = np.log(precios / precios.shift(1)).dropna()
+        pBar = returns.mean()
+        Sigma = returns.cov()
+        n_assets = len(pBar)
 
-                    total_invertido = int(df["Inversion (COP)"].sum())
-                    st.success(f"✅ Portafolio válido. Total invertido: {total_invertido:,.0f} COP")
+        # =====================
+        # Funciones Markowitz
+        # =====================
+        def portfolio_return(weights):
+            return np.sum(pBar * weights)
 
-                    # Guardar en sesión
-                    st.session_state["portafolio_usuario"] = df
+        def portfolio_volatility(weights):
+            return np.sqrt(np.dot(weights.T, np.dot(Sigma, weights)))
 
-                    # -------------------------
-                    # Selector de gráfico
-                    # -------------------------
-                    chart_type = st.radio("📊 Selecciona el tipo de gráfico:", ["Torta", "Barras"])
+        def minimize_volatility(target_return):
+            w0 = np.ones(n_assets)/n_assets
+            bounds = [(0,1)]*n_assets
+            constraints = (
+                {'type':'eq','fun': lambda w: portfolio_return(w)-target_return},
+                {'type':'eq','fun': lambda w: np.sum(w)-1}
+            )
+            return minimize(portfolio_volatility, w0, method="SLSQP", bounds=bounds, constraints=constraints)
 
-                    # generar paleta monocromática (ejemplo: azul corporativo #1f77b4)
-                    palette = generar_paleta("#1f77b4", len(df))
+        # Frontera eficiente
+        frontier_volatility, frontier_returns = [], []
+        target_returns = np.linspace(pBar.min(), pBar.max(), 30)
+        for r in target_returns:
+            opt = minimize_volatility(r)
+            if opt.success:
+                frontier_volatility.append(portfolio_volatility(opt.x))
+                frontier_returns.append(portfolio_return(opt.x))
 
-                    if chart_type == "Torta":
-                        fig = px.pie(
-                            df,
-                            names="Ticker",
-                            values="Porcentaje",
-                            title="Distribución del Portafolio (%)",
-                            hole=0.3,
-                            color="Ticker",
-                            color_discrete_sequence=palette
-                        )
-                        fig.update_traces(textinfo="percent+label", textfont_size=14, pull=[0.02]*len(df))
-                    else:
-                        fig = px.bar(
-                            df,
-                            x="Porcentaje",
-                            y="Ticker",
-                            orientation="h",
-                            text="Porcentaje",
-                            title="Distribución del Portafolio (%)",
-                            color="Ticker",
-                            color_discrete_sequence=palette
-                        )
-                        fig.update_traces(texttemplate="%{text:.2f}%", textposition="outside")
-                        fig.update_layout(yaxis=dict(categoryorder="total ascending"))
+        # Portafolio de mínima varianza (GMVP)
+        def global_min_variance():
+            w0 = np.ones(n_assets)/n_assets
+            bounds = [(0,1)]*n_assets
+            constraints = ({'type':'eq','fun': lambda w: np.sum(w)-1})
+            return minimize(portfolio_volatility, w0, method="SLSQP", bounds=bounds, constraints=constraints)
 
-                    # Fondo oscuro elegante
-                    fig.update_layout(
-                        title_font=dict(size=22, color="white"),
-                        legend_title="Acciones",
-                        legend=dict(font=dict(size=12, color="white")),
-                        plot_bgcolor="#1e1e2f",   # gris oscuro
-                        paper_bgcolor="#1e1e2f",  # gris oscuro
-                        font=dict(color="white")
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+        gmv = global_min_variance()
 
-                    # -------------------------
-                    # Botón Iniciar Simulación
-                    # -------------------------
-                    if st.button("🚀 Iniciar simulación"):
-                        with st.spinner("Ejecutando simulación de Markowitz..."):
-                            # Aquí irá tu código de Markowitz, por ahora un dummy
-                            resultados = {
-                                "Retorno esperado": "18.65%",
-                                "Riesgo (Volatilidad)": "12%",
-                                "Sharpe Ratio": "1.55"
-                            }
-                            st.session_state["resultados_simulacion"] = resultados
-                            st.success("✅ Simulación completada con éxito")
+        # Portafolio de máxima razón de Sharpe
+        risk_free = 0.0
+        def negative_sharpe(weights):
+            ret = portfolio_return(weights)
+            vol = portfolio_volatility(weights)
+            return -(ret-risk_free)/vol
 
-                    # -------------------------
-                    # Botón Finalizar Simulación
-                    # -------------------------
-                    if "resultados_simulacion" in st.session_state:
-                        if st.button("🏁 Finalizar simulación"):
-                            st.session_state["simulacion_finalizada"] = True
-                            st.success("🔓 Ya puedes acceder a la pestaña de Optimización.")
+        def max_sharpe():
+            w0 = np.ones(n_assets)/n_assets
+            bounds = [(0,1)]*n_assets
+            constraints = ({'type':'eq','fun': lambda w: np.sum(w)-1})
+            return minimize(negative_sharpe, w0, method="SLSQP", bounds=bounds, constraints=constraints)
 
-    except Exception as e:
-        st.error(f"⚠️ Error al procesar el archivo: {e}")
-else:
-    st.info("📥 Sube un CSV para ver la distribución.")
+        ms = max_sharpe()
+
+        # =====================
+        # Mostrar Resultados
+        # =====================
+        st.subheader("📈 Resultados de la Simulación")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Portafolio de Mínima Varianza (GMVP):**")
+            st.write("Pesos:", dict(zip(pBar.index, np.round(gmv.x, 3))))
+            st.write("Retorno esperado:", round(portfolio_return(gmv.x)*100, 2), "%")
+            st.write("Volatilidad:", round(portfolio_volatility(gmv.x)*100, 2), "%")
+
+        with col2:
+            st.markdown("**Portafolio de Máxima Razón de Sharpe:**")
+            st.write("Pesos:", dict(zip(pBar.index, np.round(ms.x, 3))))
+            st.write("Retorno esperado:", round(portfolio_return(ms.x)*100, 2), "%")
+            st.write("Volatilidad:", round(portfolio_volatility(ms.x)*100, 2), "%")
+
+        # =====================
+        # Gráfico Frontera Eficiente
+        # =====================
+        st.subheader("📊 Frontera Eficiente")
+        fig, ax = plt.subplots(figsize=(8,5))
+        ax.plot(frontier_volatility, frontier_returns, 'b--', label="Frontera Eficiente")
+        ax.scatter(portfolio_volatility(gmv.x), portfolio_return(gmv.x), c="red", marker="o", s=80, label="GMVP")
+        ax.scatter(portfolio_volatility(ms.x), portfolio_return(ms.x), c="green", marker="*", s=120, label="Max Sharpe")
+        ax.set_xlabel("Volatilidad (Riesgo)")
+        ax.set_ylabel("Retorno Esperado")
+        ax.legend()
+        st.pyplot(fig)
+
+        # =====================
+        # Botón para avanzar
+        # =====================
+        if st.button("✅ Finalizar Simulación y continuar a Página 3"):
+            st.session_state["simulacion_finalizada"] = True
+            st.success("Simulación finalizada. Ahora puedes ir a la Página 3.")
