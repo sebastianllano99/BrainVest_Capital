@@ -43,23 +43,28 @@ tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 # =========================
 st.title("📊 Simulación de Portafolios con Markowitz")
 
-st.write("""
-En esta sección cada equipo deberá **subir su archivo CSV** con la selección de activos.
-El archivo debe contener al menos una columna llamada **`Ticker`** con los símbolos de las acciones seleccionadas.
+st.write("Sube el archivo CSV con la selección de tu equipo. El sistema calculará el portafolio óptimo usando los datos históricos.")
 
-Ejemplo de cómo debe lucir el archivo:
-""")
-
-# Mostrar ejemplo de CSV esperado
-ejemplo = pd.DataFrame({
-    "Ticker": ["AAPL", "MSFT", "GOOGL"],
-    "Equipo": ["Equipo 1", "Equipo 1", "Equipo 1"]
+# -------------------------
+# CSV de guía para descargar
+# -------------------------
+st.markdown("### 📥 Descarga un CSV de ejemplo con la estructura correcta")
+sample_df = pd.DataFrame({
+    "Ticker": ["AAPL", "MSFT", "GOOG", "AMZN"],
+    "Porcentaje": [40, 30, 20, 10]
 })
-st.dataframe(ejemplo)
+st.download_button(
+    label="⬇️ Descargar CSV de ejemplo",
+    data=sample_df.to_csv(index=False).encode("utf-8"),
+    file_name="ejemplo_portafolio.csv",
+    mime="text/csv",
+)
+st.info("El CSV debe contener las columnas **Ticker** y **Porcentaje**, y la suma de porcentajes debe ser 100%.")
 
-st.info("👉 Asegúrate de que la columna se llame exactamente `Ticker` y contenga los símbolos correctos.")
-
-uploaded_file = st.file_uploader("📂 Sube el archivo CSV de tu equipo", type=["csv"])
+# -------------------------
+# Subida del CSV del equipo
+# -------------------------
+uploaded_file = st.file_uploader("📂 Sube tu archivo CSV de tu equipo", type=["csv"])
 
 if uploaded_file is not None:
     df_equipo = pd.read_csv(uploaded_file)
@@ -67,9 +72,13 @@ if uploaded_file is not None:
     st.write("Vista previa de tu selección:")
     st.dataframe(df_equipo.head())
 
-    # Extraer tickers seleccionados en el CSV del equipo
-    if "Ticker" not in df_equipo.columns:
-        st.error("El CSV debe contener una columna llamada 'Ticker'.")
+    # Validación básica
+    if "Ticker" not in df_equipo.columns or "Porcentaje" not in df_equipo.columns:
+        st.error("El CSV debe contener las columnas `Ticker` y `Porcentaje`.")
+        st.stop()
+
+    if abs(df_equipo["Porcentaje"].sum() - 100) > 0.01:
+        st.error("❌ La suma de los porcentajes debe ser 100%.")
         st.stop()
 
     tickers_equipo = df_equipo["Ticker"].unique().tolist()
@@ -89,7 +98,6 @@ if uploaded_file is not None:
             else:
                 st.warning(f"No se encontró histórico para {t}")
 
-        # Verificar que haya datos
         if precios.empty:
             st.error("No se encontraron datos históricos para los tickers seleccionados.")
             st.stop()
