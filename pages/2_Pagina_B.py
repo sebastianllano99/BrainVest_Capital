@@ -42,7 +42,22 @@ tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
 # INTERFAZ DE PÁGINA 2
 # =========================
 st.title("📊 Simulación de Portafolios con Markowitz")
-st.write("Sube el archivo CSV con la selección de tu equipo. El sistema calculará el portafolio óptimo usando los datos históricos.")
+
+st.write("""
+En esta sección cada equipo deberá **subir su archivo CSV** con la selección de activos.
+El archivo debe contener al menos una columna llamada **`Ticker`** con los símbolos de las acciones seleccionadas.
+
+Ejemplo de cómo debe lucir el archivo:
+""")
+
+# Mostrar ejemplo de CSV esperado
+ejemplo = pd.DataFrame({
+    "Ticker": ["AAPL", "MSFT", "GOOGL"],
+    "Equipo": ["Equipo 1", "Equipo 1", "Equipo 1"]
+})
+st.dataframe(ejemplo)
+
+st.info("👉 Asegúrate de que la columna se llame exactamente `Ticker` y contenga los símbolos correctos.")
 
 uploaded_file = st.file_uploader("📂 Sube el archivo CSV de tu equipo", type=["csv"])
 
