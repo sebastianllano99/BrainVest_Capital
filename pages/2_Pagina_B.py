@@ -108,6 +108,9 @@ if uploaded is not None:
                     total_invertido = int(df["Inversion (COP)"].sum())
                     st.success(f"✅ Portafolio válido. Total invertido: {total_invertido:,.0f} COP")
 
+                    # Guardar en sesión
+                    st.session_state["portafolio_usuario"] = df
+
                     # -------------------------
                     # Selector de gráfico
                     # -------------------------
@@ -151,6 +154,28 @@ if uploaded is not None:
                         font=dict(color="white")
                     )
                     st.plotly_chart(fig, use_container_width=True)
+
+                    # -------------------------
+                    # Botón Iniciar Simulación
+                    # -------------------------
+                    if st.button("🚀 Iniciar simulación"):
+                        with st.spinner("Ejecutando simulación de Markowitz..."):
+                            # Aquí irá tu código de Markowitz, por ahora un dummy
+                            resultados = {
+                                "Retorno esperado": "18.65%",
+                                "Riesgo (Volatilidad)": "12%",
+                                "Sharpe Ratio": "1.55"
+                            }
+                            st.session_state["resultados_simulacion"] = resultados
+                            st.success("✅ Simulación completada con éxito")
+
+                    # -------------------------
+                    # Botón Finalizar Simulación
+                    # -------------------------
+                    if "resultados_simulacion" in st.session_state:
+                        if st.button("🏁 Finalizar simulación"):
+                            st.session_state["simulacion_finalizada"] = True
+                            st.success("🔓 Ya puedes acceder a la pestaña de Optimización.")
 
     except Exception as e:
         st.error(f"⚠️ Error al procesar el archivo: {e}")
