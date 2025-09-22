@@ -4,7 +4,7 @@ import pandas as pd
 # ================================
 # CONFIGURACIÓN DE LA PÁGINA
 # ================================
-st.set_page_config(page_title="Simulación de Portafolio", layout="centered")
+#st.set_page_config(page_title="Simulación de Portafolio", layout="centered")
 
 st.title("📊 Simulación de Portafolio")
 st.write("""
@@ -55,3 +55,4 @@ if df_user is not None:
             
             if st.button("💾 Finalizar y Guardar"):
                 st.success("✅ Resultados guardados (placeholder).")
+
