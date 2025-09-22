@@ -36,10 +36,7 @@ st.download_button(
 # SUBIDA DE ARCHIVO DEL USUARIO
 # ================================
 st.subheader("📤 Sube tu archivo CSV")
-uploaded_file = st.file_uploader(
-    "Selecciona tu archivo CSV con la composición del portafolio", 
-    type="csv"
-)
+uploaded_file = st.file_uploader("Selecciona tu archivo CSV con la composición del portafolio", type="csv")
 
 df_user = None
 if uploaded_file is not None:
@@ -55,7 +52,6 @@ if uploaded_file is not None:
 # ================================
 st.info("📥 Cargando artefactos precomputados desde Google Drive...")
 
-# ID del ZIP en Google Drive (el que compartiste)
 ZIP_FILE_ID = "1cJFHOWURl7DYEYc4r4SWvAvV3Sl7bZCB"
 ZIP_OUTPUT = "datos_acciones.zip"
 DATA_FOLDER = "acciones"
@@ -76,15 +72,16 @@ except Exception as e:
 dataframes = {}
 if os.path.exists(DATA_FOLDER):
     for file in os.listdir(DATA_FOLDER):
-        if file.endswith(".csv") and "_" in file:
-            # Solo procesar los CSV de acciones con formato: TICKER_fecha_inicio_fecha_fin.csv
+        if file.endswith(".csv"):
+            # extraer ticker antes del primer "_"
             ticker = file.split("_")[0].upper()
             try:
                 df = pd.read_csv(os.path.join(DATA_FOLDER, file))
-                if "Adj Close" in df.columns:
-                    dataframes[ticker] = df
+                dataframes[ticker] = df
             except Exception as e:
                 st.warning(f"⚠️ No se pudo cargar {file}: {e}")
+
+st.write("📂 Tickers disponibles en la base de datos:", list(dataframes.keys()))
 
 # ================================
 # SIMULACIÓN DEL PORTAFOLIO
@@ -110,23 +107,27 @@ if df_user is not None and not df_user.empty:
                 # Normalizar pesos
                 df_user[col_weight] = df_user[col_weight] / df_user[col_weight].sum()
 
-                tickers = df_user[col_ticker].tolist()
+                tickers = [t.strip().upper() for t in df_user[col_ticker].tolist()]
                 weights = df_user[col_weight].values
 
                 # Construir matriz de retornos
                 returns_data = []
                 for ticker in tickers:
-                    ticker = ticker.upper()
                     if ticker in dataframes:
                         df = dataframes[ticker]
+                        if "Adj Close" not in df.columns:
+                            st.error(f"❌ El archivo de {ticker} no tiene columna 'Adj Close'.")
+                            returns_data = []
+                            break
                         returns = df["Adj Close"].pct_change().dropna()
-                        returns_data.append(returns)
+                        returns_data.append(returns.reset_index(drop=True))
                     else:
                         st.error(f"❌ No se encontraron datos históricos para {ticker}.")
                         returns_data = []
                         break
 
                 if returns_data:
+                    # Alinear series por índice
                     returns_matrix = pd.concat(returns_data, axis=1)
                     returns_matrix.columns = tickers
 
