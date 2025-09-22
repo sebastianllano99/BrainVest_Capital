@@ -4,7 +4,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import io, zipfile, requests
 
-#st.set_page_config(page_title="Portafolio Óptimo", layout="wide")
+# ================================
+# CONFIGURACIÓN DE LA PÁGINA
+# ================================
 st.title("📊 Análisis de Portafolios")
 
 # --- ID de la hoja de Google Sheets ---
@@ -129,7 +131,7 @@ st.plotly_chart(fig2, use_container_width=True)
 # --- Frontera eficiente desde ZIP ---
 st.write("### 📈 Frontera Eficiente - Markowitz")
 
-# URL directa al ZIP en Google Drive
+# ID del archivo ZIP en Google Drive
 FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"
 url_zip = f"https://drive.google.com/uc?id={FILE_ID}"
 
@@ -195,5 +197,3 @@ st.markdown("""
     div[data-baseweb="select"] span { color: #00CFFF !important; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
-
-
