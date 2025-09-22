@@ -7,14 +7,14 @@ import io, zipfile, requests
 # ================================
 # CONFIGURACIÓN DE LA PÁGINA
 # ================================
-st.title("📊 Análisis de Portafolios")
+st.title(" Análisis de Portafolios")
 
 # --- ID de la hoja de Google Sheets ---
 SHEET_ID = "19xIH0ipdUYg0XELl4mHBLcNbmQ5vxQcL"
 url_excel = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
 
 # --- Leer todas las hojas desde Google Sheets ---
-st.info("📥 Cargando base de datos desde Google Drive, por favor espera...")
+st.info("Cargando base de datos desde Google Drive, por favor espera...")
 df_dict = pd.read_excel(url_excel, sheet_name=None, engine="openpyxl")
 
 # --- Extraer hojas ---
@@ -30,16 +30,16 @@ if df_res is not None and "Ganancia Anual" in df_res.columns:
     df_res["Ganancia Anual"] = df_res["Ganancia Anual"].apply(formato_pesos)
 
 # --- Mostrar tabla de resultados ---
-st.subheader("📑 Resultados Globales")
+st.subheader(" Resultados Globales")
 st.dataframe(df_res)
 
 # --- Selector de portafolio ---
 portafolios = df_res["Portafolio"].unique()
-seleccionado = st.selectbox("🔎 Selecciona un portafolio", portafolios)
+seleccionado = st.selectbox("Selecciona un portafolio", portafolios)
 
 datos_sel = df_res[df_res["Portafolio"] == seleccionado].iloc[0]
 
-st.subheader(f"🌟 Portafolio: {seleccionado}")
+st.subheader(f" Portafolio: {seleccionado}")
 
 # --- Mostrar métricas con color verde ---
 col1, col2, col3 = st.columns(3)
@@ -48,7 +48,7 @@ col2.markdown(f"<p style='color:#00FF9D; font-size:20px;'>Riesgo Anual:<br>{dato
 col3.markdown(f"<p style='color:#00FF9D; font-size:20px;'>Ganancia Anual:<br>{datos_sel['Ganancia Anual']}</p>", unsafe_allow_html=True)
 
 # --- Distribución del portafolio ---
-st.write(f"### 📌 Distribución de Activos – {seleccionado}")
+st.write(f"###  Distribución de Activos – {seleccionado}")
 
 if seleccionado == "GMVP" and df_gmvp is not None:
     comp_sel = df_gmvp
@@ -73,10 +73,10 @@ if comp_sel is not None:
     )
     st.plotly_chart(fig1, use_container_width=True)
 else:
-    st.warning(f"⚠️ No hay datos de composición para {seleccionado}")
+    st.warning(f" No hay datos de composición para {seleccionado}")
 
 # --- Comparación Retorno vs Riesgo ---
-st.write("### 🌐 Comparación Portafolios")
+st.write("### Comparación Portafolios")
 
 fig2 = go.Figure()
 
@@ -129,7 +129,7 @@ fig2.update_layout(
 st.plotly_chart(fig2, use_container_width=True)
 
 # --- Frontera eficiente desde ZIP ---
-st.write("### 📈 Frontera Eficiente - Markowitz")
+st.write("###  Frontera Eficiente - Markowitz")
 
 # Nuevo ID del archivo ZIP en Google Drive
 FILE_ID = "1cJFHOWURl7DYEYc4r4SWvAvV3Sl7bZCB"
@@ -197,3 +197,4 @@ st.markdown("""
     div[data-baseweb="select"] span { color: #00CFFF !important; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
+
