@@ -131,8 +131,8 @@ st.plotly_chart(fig2, use_container_width=True)
 # --- Frontera eficiente desde ZIP ---
 st.write("### 📈 Frontera Eficiente - Markowitz")
 
-# ID del archivo ZIP en Google Drive
-FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"
+# Nuevo ID del archivo ZIP en Google Drive
+FILE_ID = "1cJFHOWURl7DYEYc4r4SWvAvV3Sl7bZCB"
 url_zip = f"https://drive.google.com/uc?id={FILE_ID}"
 
 # Descargar ZIP en memoria
