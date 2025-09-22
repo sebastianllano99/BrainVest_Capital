@@ -9,7 +9,7 @@ import os
 # ================================
 # CONFIGURACIÓN DE LA PÁGINA
 # ================================
-st.set_page_config(page_title="📄 Página 2 — Simulación de Portafolio", layout="wide")
+#st.set_page_config(page_title="📄 Página 2 — Simulación de Portafolio", layout="wide")
 
 st.title("📄 Página 2 — Simulación de Portafolio")
 st.write("""
@@ -166,3 +166,4 @@ if df_user is not None and not df_user.empty:
 
         except Exception as e:
             st.error(f"❌ Error en la simulación: {e}")
+
