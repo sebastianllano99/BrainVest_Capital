@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import io, zipfile, requests
 
 #st.set_page_config(page_title="Portafolio Óptimo", layout="wide")
 st.title("📊 Análisis de Portafolios")
@@ -125,27 +126,36 @@ fig2.update_layout(
 
 st.plotly_chart(fig2, use_container_width=True)
 
-# --- Frontera eficiente ---
+# --- Frontera eficiente desde ZIP ---
 st.write("### 📈 Frontera Eficiente - Markowitz")
 
-# Escalar retornos diarios a porcentaje
-df_res["Retorno Diario %"] = df_res["Retorno Diario"] * 100
+# URL directa al ZIP en Google Drive
+url_zip = "https://drive.google.com/uc?id=1cJFHOWURl7DYEYc4r4SWvAvV3Sl7bZCB"
+
+# Descargar ZIP en memoria
+resp = requests.get(url_zip)
+with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+    with z.open("frontier.csv") as f:
+        df_frontier = pd.read_csv(f)
+
+# Escalar a anual
+df_frontier["Retorno Anual %"] = df_frontier["Retorno_Diario"] * 252 * 100
+df_frontier["Riesgo Anual %"] = df_frontier["Volatilidad_Diaria"] * (252**0.5) * 100
 
 fig3 = go.Figure()
 
 # Frontera eficiente
 fig3.add_trace(go.Scatter(
-    x=df_res["Riesgo Diario"], y=df_res["Retorno Diario %"],
+    x=df_frontier["Riesgo Anual %"], y=df_frontier["Retorno Anual %"],
     mode="lines+markers", line=dict(color="#00CFFF", width=2),
     name="Frontera Eficiente"
 ))
 
 # GMVP
-if df_gmvp is not None:
-    gmvp = df_gmvp.iloc[0]
+if "GMVP" in df_res["Portafolio"].values:
+    mvp = df_res[df_res["Portafolio"] == "GMVP"]
     fig3.add_trace(go.Scatter(
-        x=[gmvp["Riesgo Portafolio Diario"]],
-        y=[gmvp["Retorno Esperado Diario"] * 100],
+        x=mvp["Riesgo Anual"] * 100, y=mvp["Retorno Anual"] * 100,
         mode="markers+text",
         marker=dict(color="#FF4B4B", size=16, symbol="star"),
         text=["GMVP"], textposition="top right",
@@ -153,11 +163,10 @@ if df_gmvp is not None:
     ))
 
 # Max Sharpe
-if df_ms is not None:
-    ms = df_ms.iloc[0]
+if "Max Sharpe" in df_res["Portafolio"].values:
+    ms = df_res[df_res["Portafolio"] == "Max Sharpe"]
     fig3.add_trace(go.Scatter(
-        x=[ms["Riesgo Portafolio Diario"]],
-        y=[ms["Retorno Esperado Diario"] * 100],
+        x=ms["Riesgo Anual"] * 100, y=ms["Retorno Anual"] * 100,
         mode="markers+text",
         marker=dict(color="#00FF9D", size=16, symbol="star"),
         text=["Max Sharpe"], textposition="top right",
@@ -170,9 +179,9 @@ fig3.update_layout(
     plot_bgcolor="#0E1117", paper_bgcolor="#0E1117",
     font=dict(color="white"),
     title="Frontera Eficiente - Markowitz",
-    xaxis_title="Riesgo (Volatilidad Diaria)",
+    xaxis_title="Riesgo (Volatilidad Anual %)",
     yaxis=dict(
-        title="Retorno Esperado Diario (%)",
+        title="Retorno Esperado Anual (%)",
         tickformat=".2f"
     )
 )
@@ -185,7 +194,3 @@ st.markdown("""
     div[data-baseweb="select"] span { color: #00CFFF !important; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
-
-
-
-
