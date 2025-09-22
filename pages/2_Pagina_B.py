@@ -5,7 +5,7 @@ import numpy as np
 import io, zipfile, requests, os
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Página 2 — Simulación de Portafolio", layout="wide")
+#st.set_page_config(page_title="Página 2 — Simulación de Portafolio", layout="wide")
 st.title("📥 Página 2 — Subir portafolio y simular")
 
 st.markdown("""
@@ -377,3 +377,4 @@ else:
 st.markdown("---")
 st.caption("Notas: La comparación con la frontera usa interpolación lineal entre los puntos precomputados. "
            "La precisión depende de la densidad de puntos en frontier.csv y de la tolerancia relativa seleccionada.")
+
