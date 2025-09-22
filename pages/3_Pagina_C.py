@@ -130,7 +130,8 @@ st.plotly_chart(fig2, use_container_width=True)
 st.write("### 📈 Frontera Eficiente - Markowitz")
 
 # URL directa al ZIP en Google Drive
-url_zip = "https://drive.google.com/file/d/1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_/view?usp=drive_link"
+FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"
+url_zip = f"https://drive.google.com/uc?id={FILE_ID}"
 
 # Descargar ZIP en memoria
 resp = requests.get(url_zip)
@@ -194,4 +195,5 @@ st.markdown("""
     div[data-baseweb="select"] span { color: #00CFFF !important; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
+
 
