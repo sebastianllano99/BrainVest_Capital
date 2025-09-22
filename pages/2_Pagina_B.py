@@ -16,14 +16,9 @@ except Exception:
 # -----------------------
 # Configuración: IDs / rutas
 # -----------------------
-# ZIP con resultados precomputados Markowitz
-ZIP_REPORT_ID = "1cJFHOWURl7DYEYc4r4SWvAvV3Sl7bZCB"
-ZIP_REPORT_NAME = "report_markowitz.zip"
-REPORT_FOLDER = "report_markowitz"
-
-# ZIP con históricos de acciones
-ZIP_ACTIONS_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"
-ZIP_ACTIONS_NAME = "datos_acciones.zip"
+# ZIP de históricos
+HISTORICOS_ZIP_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"
+HISTORICOS_ZIP_NAME = "datos_acciones.zip"
 ACTIONS_FOLDER = "acciones"
 
 # Archivos que vamos a guardar (resultados del usuario)
@@ -61,10 +56,19 @@ def ensure_folder_from_zip(file_id, zip_name, folder_name):
         if not os.path.exists(folder_name):
             os.makedirs(folder_name, exist_ok=True)
             with zipfile.ZipFile(zip_name, "r") as z:
+                # extraer cada archivo al folder_name directamente
                 for f in z.namelist():
                     if f.lower().endswith(".csv") or f.lower().endswith(".npy"):
+                        base = os.path.basename(f)
                         z.extract(f, folder_name)
-        # Comprobar si hay CSV dentro
+                        # mover al nivel raíz
+                        os.rename(os.path.join(folder_name, f), os.path.join(folder_name, base))
+                        # eliminar carpetas vacías internas
+                        dir_created = os.path.join(folder_name, os.path.dirname(f))
+                        if os.path.exists(dir_created):
+                            try: os.rmdir(dir_created)
+                            except: pass
+
         csv_files = [f for f in os.listdir(folder_name) if f.lower().endswith(".csv")]
         return len(csv_files) > 0
     except zipfile.BadZipFile:
@@ -106,17 +110,17 @@ def detect_adjcol_and_datecol(df: pd.DataFrame):
 # -----------------------
 # Interfaz
 # -----------------------
-st.title("Simulación de Portafolio — Markowitz")
+st.title("Página 2 — Simulación de Portafolio")
 st.write("""
-Sube un CSV con columnas `Ticker` y `% del Portafolio`.  
-Al cargarlo aparecerá el botón **Iniciar Simulación**.
+Sube un CSV con columnas `Ticker` y `% del Portafolio` (o nombres parecidos).  
+Al cargar el CSV aparecerá el botón **Iniciar Simulación**. Después de ver resultados, podrás **Finalizar / Guardar**.
 """)
 
-# Botón para ejemplo
+# botón para ejemplo
 ejemplo = pd.DataFrame({"Ticker":["AAPL","MSFT","GOOGL"], "% del Portafolio":[40,30,30]})
 st.download_button(" Descargar ejemplo CSV", ejemplo.to_csv(index=False), file_name="ejemplo_portafolio.csv")
 
-# Subida de CSV del usuario
+# uploader
 uploaded = st.file_uploader("Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
 if uploaded:
@@ -128,26 +132,20 @@ if uploaded:
         st.error(f"Error leyendo tu CSV: {e}")
         st.stop()
 
-# Descargar y extraer ZIPs si no existen
-ok_report = ensure_folder_from_zip(ZIP_REPORT_ID, ZIP_REPORT_NAME, REPORT_FOLDER)
-ok_actions = ensure_folder_from_zip(ZIP_ACTIONS_ID, ZIP_ACTIONS_NAME, ACTIONS_FOLDER)
+# Descargar/extraer ZIP si es necesario
+ok = ensure_folder_from_zip(HISTORICOS_ZIP_ID, HISTORICOS_ZIP_NAME, ACTIONS_FOLDER)
+if not ok:
+    st.error("No hay históricos disponibles. Revisa tu ZIP de acciones.")
+    st.stop()
 
-if not ok_actions:
-    st.warning("No se pudieron cargar los históricos de acciones. Verifica el ZIP de acciones.")
-if not ok_report:
-    st.warning("No se pudieron cargar los resultados precomputados de Markowitz. Verifica el ZIP de reportes.")
+# mostrar tickers disponibles
+tickers_avail = [f[:-4].upper() for f in os.listdir(ACTIONS_FOLDER) if f.lower().endswith(".csv")]
+st.info(f" Tickers disponibles localmente: {len(tickers_avail)} (muestra 20) {tickers_avail[:20]}")
 
-# Mostrar tickers disponibles
-if os.path.exists(ACTIONS_FOLDER):
-    tickers_avail = [f[:-4].upper() for f in os.listdir(ACTIONS_FOLDER) if f.lower().endswith(".csv")]
-    st.info(f" Tickers disponibles: {len(tickers_avail)} (muestra 20) {tickers_avail[:20]}")
-
-# -----------------------
-# Simulación del portafolio del usuario
-# -----------------------
-if df_user is not None and ok_actions:
+# Mostrar botón Iniciar sólo si CSV cargado
+if df_user is not None:
     if st.button(" Iniciar Simulación"):
-        # Detectar columnas
+        # detectar columnas
         cols_lower = [c.strip().lower() for c in df_user.columns]
         col_ticker = None
         col_weight = None
@@ -158,19 +156,18 @@ if df_user is not None and ok_actions:
                 col_weight = c_orig
 
         if col_ticker is None or col_weight is None:
-            st.error("Tu CSV debe tener columnas con Ticker y % del Portafolio.")
+            st.error(" Tu CSV debe tener columnas con Ticker y con el % (ej. '% del Portafolio' o 'Peso').")
         else:
             # Normalizar pesos
             df_user[col_weight] = pd.to_numeric(df_user[col_weight], errors="coerce")
             if df_user[col_weight].isnull().any():
-                st.error("Algunos pesos no son numéricos.")
+                st.error(" Algunos pesos no son numéricos.")
             else:
                 df_user[col_weight] = df_user[col_weight] / df_user[col_weight].sum()
-
                 tickers = [str(x).strip().upper() for x in df_user[col_ticker].tolist()]
                 weights = df_user[col_weight].values
 
-                # Cargar series históricas
+                # Cargar series de retornos diarios
                 series_list = []
                 missing = []
                 for t in tickers:
@@ -191,26 +188,26 @@ if df_user is not None and ok_actions:
                     series_list.append(s)
 
                 if missing:
-                    st.error(f"No se pudieron cargar series válidas. Faltantes: {missing}")
+                    st.error(f"No se encontraron históricos válidos para: {missing}")
+                    st.stop()
                 elif len(series_list) == 0:
-                    st.error("No hay series válidas para construir la matriz de retornos.")
+                    st.error("No se pudieron cargar series válidas. Ajusta tu CSV o verifica la carpeta de históricos.")
+                    st.stop()
                 else:
                     returns_df = pd.concat(series_list, axis=1, join="inner").dropna()
                     if returns_df.shape[1] == 0:
                         st.error("No hay solape de fechas entre las series seleccionadas.")
+                        st.stop()
                     else:
-                        mean_returns = returns_df.mean()           # diario
-                        cov_matrix = returns_df.cov()              # diario
-
-                        # Cálculo portafolio usuario (anualizado)
+                        mean_returns = returns_df.mean()
+                        cov_matrix = returns_df.cov()
                         port_ret_ann = float(np.dot(weights, mean_returns) * 252)
                         port_vol_ann = float(np.sqrt(np.dot(weights.T, np.dot(cov_matrix * 252, weights))))
 
-                        st.subheader("Resultados de simulación (Usuario)")
+                        st.subheader(" Resultados de simulación (Usuario)")
                         st.write(f"- Retorno anual esperado: **{port_ret_ann:.2%}**")
                         st.write(f"- Volatilidad anual esperada: **{port_vol_ann:.2%}**")
 
-                        # Mostrar distribución
                         distrib = pd.DataFrame({
                             "Ticker": tickers,
                             "% del Portafolio": (weights * 100).round(6),
@@ -218,7 +215,6 @@ if df_user is not None and ok_actions:
                         })
                         st.dataframe(distrib)
 
-                        # Guardar resultados
                         if st.button(" Finalizar y Guardar Resultados"):
                             distrib.to_csv(RESULT_CSV, index=False, encoding="utf-8-sig")
                             resumen = pd.DataFrame([{
