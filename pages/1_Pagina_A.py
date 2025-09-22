@@ -11,7 +11,7 @@ import gdown
 
 # CONFIGURACIÓN DE DATOS
 
-ZIP_FILE_ID = "19R9zQNq5vmNuP3l2BMvN0V7rmNvegGas"
+ZIP_FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"
 CARPETA_DATOS = "acciones"
 ZIP_NAME = "acciones.zip"
 
@@ -137,6 +137,7 @@ if pagina == "Análisis Histórico":
                                  line=dict(color=azul, width=3)))
     fig_ret.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_ret, use_container_width=True)
+
 
 
 
