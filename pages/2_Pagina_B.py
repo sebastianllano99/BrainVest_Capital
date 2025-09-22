@@ -50,7 +50,7 @@ def ensure_actions_folder():
         # descargar
         ok = download_zip_from_drive(ZIP_FILE_ID, ZIP_NAME)
         if not ok:
-            st.warning("⚠️ No se pudo descargar el ZIP desde Drive (revisa permisos / id).")
+            st.warning("No se pudo descargar el ZIP desde Drive (revisa permisos / id).")
             return False
 
         # extraer (el ZIP trae la carpeta 'acciones')
@@ -105,7 +105,7 @@ def detect_adjcol_and_datecol(df: pd.DataFrame):
 # -----------------------
 # Interfaz
 # -----------------------
-st.title("📄 Página 2 — Simulación de Portafolio")
+st.title("Página 2 — Simulación de Portafolio")
 st.write("""
 Sube un CSV con columnas `Ticker` y `% del Portafolio` (o nombres parecidos).  
 Al cargar el CSV aparecerá el botón **Iniciar Simulación**. Después de ver resultados, podrás **Finalizar / Guardar**.
@@ -113,7 +113,7 @@ Al cargar el CSV aparecerá el botón **Iniciar Simulación**. Después de ver r
 
 # botón para ejemplo
 ejemplo = pd.DataFrame({"Ticker":["AAPL","MSFT","GOOGL"], "% del Portafolio":[40,30,30]})
-st.download_button("📥 Descargar ejemplo CSV", ejemplo.to_csv(index=False), file_name="ejemplo_portafolio.csv")
+st.download_button(" Descargar ejemplo CSV", ejemplo.to_csv(index=False), file_name="ejemplo_portafolio.csv")
 
 # uploader
 uploaded = st.file_uploader("Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
@@ -121,22 +121,22 @@ df_user = None
 if uploaded:
     try:
         df_user = pd.read_csv(uploaded)
-        st.success("✅ CSV cargado")
+        st.success("CSV cargado")
         st.dataframe(df_user)
     except Exception as e:
-        st.error(f"❌ Error leyendo tu CSV: {e}")
+        st.error(f"Error leyendo tu CSV: {e}")
         st.stop()
 
 # mostrar tickers disponibles (si ya tenemos carpeta)
 if os.path.exists(DATA_FOLDER):
     tickers_avail = [f[:-4].upper() for f in os.listdir(DATA_FOLDER) if f.lower().endswith(".csv")]
-    st.info(f"📂 Tickers disponibles localmente: {len(tickers_avail)} (muestra 20) {tickers_avail[:20]}")
+    st.info(f" Tickers disponibles localmente: {len(tickers_avail)} (muestra 20) {tickers_avail[:20]}")
 else:
-    st.info("ℹ️ Aún no se ha descargado/extrado la carpeta 'acciones' con históricos.")
+    st.info(" Aún no se ha descargado/extrado la carpeta 'acciones' con históricos.")
 
 # Mostrar botón Iniciar sólo si CSV cargado
 if df_user is not None:
-    if st.button("🚀 Iniciar Simulación"):
+    if st.button(" Iniciar Simulación"):
         # detectar columnas
         cols_lower = [c.strip().lower() for c in df_user.columns]
         col_ticker = None
@@ -148,19 +148,19 @@ if df_user is not None:
                 col_weight = c_orig
 
         if col_ticker is None or col_weight is None:
-            st.error("❌ Tu CSV debe tener columnas con Ticker y con el % (ej. '% del Portafolio' o 'Peso').")
+            st.error(" Tu CSV debe tener columnas con Ticker y con el % (ej. '% del Portafolio' o 'Peso').")
         else:
             # Normalizar pesos
             df_user[col_weight] = pd.to_numeric(df_user[col_weight], errors="coerce")
             if df_user[col_weight].isnull().any():
-                st.error("❌ Algunos pesos no son numéricos.")
+                st.error(" Algunos pesos no son numéricos.")
             else:
                 df_user[col_weight] = df_user[col_weight] / df_user[col_weight].sum()
 
                 # Descargar/extraer ZIP si es necesario
                 ok = ensure_actions_folder()
                 if not ok:
-                    st.error("❌ No hay carpeta 'acciones' con históricos. Revisa el ZIP en Drive.")
+                    st.error(" No hay carpeta 'acciones' con históricos. Revisa el ZIP en Drive.")
                 else:
                     tickers = [str(x).strip().upper() for x in df_user[col_ticker].tolist()]
                     weights = df_user[col_weight].values
@@ -186,13 +186,13 @@ if df_user is not None:
                         series_list.append(s)
 
                     if missing:
-                        st.error(f"❌ No se encontraron históricos válidos para: {missing}")
+                        st.error(f"No se encontraron históricos válidos para: {missing}")
                     elif len(series_list) == 0:
-                        st.error("❌ No se pudo construir la matriz de retornos (no hay series válidas).")
+                        st.error(" No se pudo construir la matriz de retornos (no hay series válidas).")
                     else:
                         returns_df = pd.concat(series_list, axis=1, join="inner").dropna()
                         if returns_df.shape[1] == 0:
-                            st.error("❌ No hay solape de fechas entre las series seleccionadas.")
+                            st.error(" No hay solape de fechas entre las series seleccionadas.")
                         else:
                             mean_returns = returns_df.mean()           # diario
                             cov_matrix = returns_df.cov()              # diario
@@ -201,7 +201,7 @@ if df_user is not None:
                             port_ret_ann = float(np.dot(weights, mean_returns) * 252)
                             port_vol_ann = float(np.sqrt(np.dot(weights.T, np.dot(cov_matrix * 252, weights))))
 
-                            st.subheader("📌 Resultados de simulación (Usuario)")
+                            st.subheader(" Resultados de simulación (Usuario)")
                             st.write(f"- Retorno anual esperado: **{port_ret_ann:.2%}**")
                             st.write(f"- Volatilidad anual esperada: **{port_vol_ann:.2%}**")
 
@@ -214,7 +214,7 @@ if df_user is not None:
                             st.dataframe(distrib)
 
                             # permitir finalizar/guardar
-                            if st.button("💾 Finalizar y Guardar Resultados"):
+                            if st.button(" Finalizar y Guardar Resultados"):
                                 # guardar archivo con composición
                                 distrib.to_csv(RESULT_CSV, index=False, encoding="utf-8-sig")
                                 # guardar resumen con métricas para Página 3
@@ -232,4 +232,5 @@ if df_user is not None:
                                     "retorno_anual": port_ret_ann,
                                     "riesgo_anual": port_vol_ann
                                 }
-                                st.success(f"✅ Resultados guardados: {RESULT_CSV} y {SUMMARY_CSV}")
+                                st.success(f"Resultados guardados: {RESULT_CSV} y {SUMMARY_CSV}")
+
