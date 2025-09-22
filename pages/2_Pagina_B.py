@@ -36,7 +36,9 @@ st.download_button(
 # SUBIDA DE ARCHIVO DEL USUARIO
 # ================================
 st.subheader("📤 Sube tu archivo CSV")
-uploaded_file = st.file_uploader("Selecciona tu archivo CSV con la composición del portafolio", type="csv")
+uploaded_file = st.file_uploader(
+    "Selecciona tu archivo CSV con la composición del portafolio", type="csv"
+)
 
 df_user = None
 if uploaded_file is not None:
@@ -52,7 +54,7 @@ if uploaded_file is not None:
 # ================================
 st.info("📥 Cargando artefactos precomputados desde Google Drive...")
 
-ZIP_FILE_ID = "1cJFHOWURl7DYEYc4r4SWvAvV3Sl7bZCB"
+ZIP_FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"  # <-- tu ZIP real
 ZIP_OUTPUT = "datos_acciones.zip"
 DATA_FOLDER = "acciones"
 
@@ -73,15 +75,23 @@ dataframes = {}
 if os.path.exists(DATA_FOLDER):
     for file in os.listdir(DATA_FOLDER):
         if file.endswith(".csv"):
-            # extraer ticker antes del primer "_"
-            ticker = file.split("_")[0].upper()
-            try:
-                df = pd.read_csv(os.path.join(DATA_FOLDER, file))
-                dataframes[ticker] = df
-            except Exception as e:
-                st.warning(f"⚠️ No se pudo cargar {file}: {e}")
+            base = file.replace(".csv", "")
+            ticker = base.split("_")[0].upper()  # soporta AAPL.csv o AAPL_2000-01-01_2024-12-31.csv
 
-st.write("📂 Tickers disponibles en la base de datos:", list(dataframes.keys()))
+            file_path = os.path.join(DATA_FOLDER, file)
+            try:
+                df_temp = pd.read_csv(file_path)
+                if "Adj Close" in df_temp.columns:
+                    dataframes[ticker] = df_temp
+                else:
+                    st.warning(f"⚠️ {file} no tiene columna 'Adj Close'.")
+            except Exception as e:
+                st.warning(f"⚠️ No se pudo leer {file}: {e}")
+
+if dataframes:
+    st.info(f"📂 Tickers cargados: {list(dataframes.keys())[:20]} ... (total: {len(dataframes)})")
+else:
+    st.error("❌ No se encontraron datos históricos en la carpeta extraída.")
 
 # ================================
 # SIMULACIÓN DEL PORTAFOLIO
@@ -92,7 +102,6 @@ if df_user is not None and not df_user.empty:
             # Normalizar nombres de columnas
             df_user.columns = [col.strip().lower() for col in df_user.columns]
 
-            # Detectar columnas de ticker y pesos
             col_ticker = None
             col_weight = None
             for col in df_user.columns:
@@ -107,18 +116,13 @@ if df_user is not None and not df_user.empty:
                 # Normalizar pesos
                 df_user[col_weight] = df_user[col_weight] / df_user[col_weight].sum()
 
-                tickers = [t.strip().upper() for t in df_user[col_ticker].tolist()]
+                tickers = df_user[col_ticker].tolist()
                 weights = df_user[col_weight].values
 
-                # Construir matriz de retornos
                 returns_data = []
                 for ticker in tickers:
-                    if ticker in dataframes:
-                        df = dataframes[ticker]
-                        if "Adj Close" not in df.columns:
-                            st.error(f"❌ El archivo de {ticker} no tiene columna 'Adj Close'.")
-                            returns_data = []
-                            break
+                    if ticker.upper() in dataframes:
+                        df = dataframes[ticker.upper()]
                         returns = df["Adj Close"].pct_change().dropna()
                         returns_data.append(returns.reset_index(drop=True))
                     else:
@@ -127,14 +131,12 @@ if df_user is not None and not df_user.empty:
                         break
 
                 if returns_data:
-                    # Alinear series por índice
                     returns_matrix = pd.concat(returns_data, axis=1)
                     returns_matrix.columns = tickers
 
                     mean_returns = returns_matrix.mean()
                     cov_matrix = returns_matrix.cov()
 
-                    # Cálculo del portafolio
                     port_return = np.dot(weights, mean_returns) * 252  # anualizado
                     port_vol = np.sqrt(np.dot(weights.T, np.dot(cov_matrix * 252, weights)))
 
