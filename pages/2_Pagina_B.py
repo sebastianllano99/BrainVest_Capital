@@ -1,168 +1,117 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io
-import zipfile
-import gdown
+import plotly.express as px
+import plotly.graph_objects as go
 import os
+import gdown
+import zipfile
 
 # ================================
 # CONFIGURACIÓN DE LA PÁGINA
 # ================================
-st.title("📄 Página 2 — Simulación de Portafolio")
+st.title("📊 Página 3 — Comparación con Frontera Eficiente")
 st.write("""
-En esta página podrás **subir tu propio portafolio en formato CSV**, 
-simular su comportamiento y comparar sus resultados con los portafolios óptimos 
-(GMVP y Max Sharpe) que tenemos precomputados.  
+En esta página se comparará el **portafolio del usuario** con la **frontera eficiente**, 
+el portafolio de **mínima varianza (GMVP)** y el de **máxima Sharpe**.
 """)
 
 # ================================
-# DESCARGA DE EJEMPLO DE CSV
+# FUENTE 1: ARTEFACTOS PRECOMPUTADOS
 # ================================
-ejemplo = pd.DataFrame({
-    "Ticker": ["AAPL", "MSFT", "GOOGL", "AMZN"],
-    "% del Portafolio": [25, 25, 25, 25]
-})
-csv_ejemplo = ejemplo.to_csv(index=False)
+st.info("📥 Cargando artefactos precomputados...")
 
-st.download_button(
-    label="📥 Descargar Ejemplo de CSV",
-    data=csv_ejemplo,
-    file_name="ejemplo_portafolio.csv",
-    mime="text/csv"
-)
+ARTIFACTS_FILE_ID = "1cJFHOWURl7DYEYc4r4SWvAvV3Sl7bZCB"  # <-- tu ID real del ZIP de artefactos
+ARTIFACTS_ZIP = "artefactos.zip"
+ARTIFACTS_FOLDER = "artefactos"
+
+try:
+    gdown.download(f"https://drive.google.com/uc?id={ARTIFACTS_FILE_ID}", ARTIFACTS_ZIP, quiet=False)
+    with zipfile.ZipFile(ARTIFACTS_ZIP, "r") as zip_ref:
+        zip_ref.extractall(ARTIFACTS_FOLDER)
+    st.success("✅ Artefactos cargados correctamente")
+except Exception as e:
+    st.error(f"❌ No se pudieron cargar los artefactos: {e}")
 
 # ================================
-# SUBIDA DE ARCHIVO DEL USUARIO
+# LECTURA DE ARCHIVOS PRECOMPUTADOS
 # ================================
-st.subheader("📤 Sube tu archivo CSV")
-uploaded_file = st.file_uploader(
-    "Selecciona tu archivo CSV con la composición del portafolio", type="csv"
-)
+frontier, gmvp, maxsharpe, mean_returns, tickers_list = None, None, None, None, None
+
+try:
+    frontier = pd.read_csv(os.path.join(ARTIFACTS_FOLDER, "frontier.csv"))
+    gmvp = pd.read_csv(os.path.join(ARTIFACTS_FOLDER, "GMVP.csv"))
+    maxsharpe = pd.read_csv(os.path.join(ARTIFACTS_FOLDER, "MaxSharpe.csv"))
+    mean_returns = pd.read_csv(os.path.join(ARTIFACTS_FOLDER, "mean_returns.csv"))
+    tickers_list = pd.read_csv(os.path.join(ARTIFACTS_FOLDER, "tickers.csv"))
+
+    st.success("✅ Archivos precomputados leídos correctamente")
+except Exception as e:
+    st.error(f"❌ Error leyendo artefactos: {e}")
+
+# ================================
+# CARGAR RESULTADOS DEL USUARIO
+# ================================
+st.subheader("📂 Cargar resultados del Portafolio Usuario")
+uploaded_file = st.file_uploader("Sube el archivo CSV generado en Página 2", type="csv")
 
 df_user = None
 if uploaded_file is not None:
     try:
         df_user = pd.read_csv(uploaded_file)
-        st.success("✅ Archivo cargado correctamente")
+        st.success("✅ Archivo del portafolio del usuario cargado")
         st.dataframe(df_user)
     except Exception as e:
         st.error(f"❌ Error al leer el archivo: {e}")
 
 # ================================
-# DESCARGA Y CARGA DE DATOS HISTÓRICOS
+# GRAFICAR FRONTERA Y COMPARACIÓN
 # ================================
-st.info("📥 Cargando artefactos precomputados desde Google Drive...")
+if frontier is not None and gmvp is not None and maxsharpe is not None:
+    st.subheader("📈 Frontera Eficiente y Portafolios Óptimos")
 
-ZIP_FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"  # <-- ZIP con carpeta 'acciones'
-ZIP_OUTPUT = "datos_acciones.zip"
-DATA_FOLDER = "acciones"
+    fig = go.Figure()
 
-try:
-    # Descargar ZIP
-    gdown.download(f"https://drive.google.com/uc?id={ZIP_FILE_ID}", ZIP_OUTPUT, quiet=False)
+    # Frontera eficiente
+    if "Volatility" in frontier.columns and "Return" in frontier.columns:
+        fig.add_trace(go.Scatter(
+            x=frontier["Volatility"], y=frontier["Return"],
+            mode="lines", name="Frontera Eficiente", line=dict(color="blue")
+        ))
 
-    # Extraer contenido (el ZIP ya trae la carpeta 'acciones')
-    with zipfile.ZipFile(ZIP_OUTPUT, "r") as zip_ref:
-        zip_ref.extractall(".")
+    # GMVP
+    if "Volatility" in gmvp.columns and "Return" in gmvp.columns:
+        fig.add_trace(go.Scatter(
+            x=gmvp["Volatility"], y=gmvp["Return"],
+            mode="markers", name="GMVP", marker=dict(color="green", size=12, symbol="diamond")
+        ))
 
-    st.success("✅ Datos históricos cargados correctamente")
-except Exception as e:
-    st.error(f"❌ No se pudieron cargar los artefactos precomputados desde Drive: {e}")
+    # Max Sharpe
+    if "Volatility" in maxsharpe.columns and "Return" in maxsharpe.columns:
+        fig.add_trace(go.Scatter(
+            x=maxsharpe["Volatility"], y=maxsharpe["Return"],
+            mode="markers", name="Max Sharpe", marker=dict(color="red", size=12, symbol="star")
+        ))
 
-# ================================
-# LECTURA DE LOS ARCHIVOS CSV
-# ================================
-dataframes = {}
-if os.path.exists(DATA_FOLDER):
-    for file in os.listdir(DATA_FOLDER):
-        if file.endswith(".csv"):
-            ticker = file.replace(".csv", "").upper()  # solo el ticker
-            file_path = os.path.join(DATA_FOLDER, file)
+    # Usuario
+    if df_user is not None and "Portafolio" in df_user.columns:
+        if "Retorno anual esperado" in df_user.columns and "Volatilidad anual esperada" in df_user.columns:
+            user_return = df_user["Retorno anual esperado"].iloc[0]
+            user_vol = df_user["Volatilidad anual esperada"].iloc[0]
 
-            try:
-                df_temp = pd.read_csv(file_path)
-                if "Adj Close" in df_temp.columns:
-                    dataframes[ticker] = df_temp
-                else:
-                    st.warning(f"⚠️ {file} no tiene columna 'Adj Close'.")
-            except Exception as e:
-                st.warning(f"⚠️ No se pudo leer {file}: {e}")
+            fig.add_trace(go.Scatter(
+                x=[user_vol], y=[user_return],
+                mode="markers", name="Usuario",
+                marker=dict(color="orange", size=14, symbol="circle")
+            ))
 
-if dataframes:
-    st.info(f"📂 Tickers cargados: {list(dataframes.keys())[:20]} ... (total: {len(dataframes)})")
+    fig.update_layout(
+        title="Frontera Eficiente vs Portafolios",
+        xaxis_title="Volatilidad (σ)",
+        yaxis_title="Retorno esperado (μ)",
+        legend=dict(x=0.02, y=0.98)
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 else:
-    st.error("❌ No se encontraron datos históricos en la carpeta 'acciones'.")
-
-# ================================
-# SIMULACIÓN DEL PORTAFOLIO
-# ================================
-if df_user is not None and not df_user.empty:
-    if st.button("🚀 Iniciar Simulación"):
-        try:
-            # Normalizar nombres de columnas
-            df_user.columns = [col.strip().lower() for col in df_user.columns]
-
-            col_ticker = None
-            col_weight = None
-            for col in df_user.columns:
-                if "tick" in col:
-                    col_ticker = col
-                if "por" in col or "%" in col or "weight" in col:
-                    col_weight = col
-
-            if col_ticker is None or col_weight is None:
-                st.error("❌ El CSV debe contener columnas con 'Ticker' y 'Porcentaje'.")
-            else:
-                # Normalizar pesos
-                df_user[col_weight] = df_user[col_weight] / df_user[col_weight].sum()
-
-                tickers = df_user[col_ticker].tolist()
-                weights = df_user[col_weight].values
-
-                returns_data = []
-                for ticker in tickers:
-                    if ticker.upper() in dataframes:
-                        df = dataframes[ticker.upper()]
-                        returns = df["Adj Close"].pct_change().dropna()
-                        returns_data.append(returns.reset_index(drop=True))
-                    else:
-                        st.error(f"❌ No se encontró el archivo para {ticker}.")
-                        returns_data = []
-                        break
-
-                if returns_data:
-                    returns_matrix = pd.concat(returns_data, axis=1)
-                    returns_matrix.columns = tickers
-
-                    mean_returns = returns_matrix.mean()
-                    cov_matrix = returns_matrix.cov()
-
-                    port_return = np.dot(weights, mean_returns) * 252  # anualizado
-                    port_vol = np.sqrt(np.dot(weights.T, np.dot(cov_matrix * 252, weights)))
-
-                    st.subheader("📌 Resultados de tu Portafolio")
-                    st.write(f"**Retorno anual esperado:** {port_return:.2%}")
-                    st.write(f"**Volatilidad anual esperada:** {port_vol:.2%}")
-
-                    # Guardar resultados
-                    results_df = pd.DataFrame({
-                        "Ticker": tickers,
-                        "% del Portafolio": weights * 100,
-                        "Portafolio": "Usuario"
-                    })
-
-                    results_path = "resultado_usuario.csv"
-                    results_df.to_csv(results_path, index=False)
-
-                    st.download_button(
-                        label="💾 Descargar resultados en CSV",
-                        data=results_df.to_csv(index=False),
-                        file_name="resultado_usuario.csv",
-                        mime="text/csv"
-                    )
-
-                    st.success("✅ Simulación finalizada. Resultados listos para comparar en Página 3.")
-
-        except Exception as e:
-            st.error(f"❌ Error en la simulación: {e}")
+    st.warning("⚠️ No se pudo construir la frontera eficiente por falta de archivos.")
