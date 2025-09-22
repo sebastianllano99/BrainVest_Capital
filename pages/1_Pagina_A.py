@@ -38,8 +38,12 @@ if not archivos:
     st.error("No se encontraron archivos CSV en la carpeta.") 
     st.stop()
 
-# Diccionario {ticker: ruta}
-tickers = {os.path.basename(f).split("_")[0]: f for f in archivos}
+# Diccionario {ticker: ruta}, quitando extensión .csv y evitando duplicados
+tickers = {}
+for f in archivos:
+    nombre = os.path.splitext(os.path.basename(f))[0]  # quita .csv
+    nombre = nombre.split("_")[0]  # si el archivo tiene guiones bajos, toma el primer bloque
+    tickers[nombre] = f  # guarda el ticker limpio con su ruta
 
 # NAVEGACIÓN
 
@@ -137,7 +141,3 @@ if pagina == "Análisis Histórico":
                                  line=dict(color=azul, width=3)))
     fig_ret.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_ret, use_container_width=True)
-
-
-
-
