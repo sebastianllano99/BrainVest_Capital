@@ -1,167 +1,184 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io
-import zipfile
-import gdown
 import os
+import zipfile
+import io
+import gdown
+from scipy.optimize import minimize
 
-# ================================
-# CONFIGURACIÓN DE LA PÁGINA
-# ================================
-st.title("📄 Página 2 — Simulación de Portafolio")
-st.write("""
-En esta página podrás **subir tu propio portafolio en formato CSV**, 
-simular su comportamiento y comparar sus resultados con los portafolios óptimos 
-(GMVP y Max Sharpe) que tenemos precomputados.  
+# =========================
+# CONFIGURACIÓN
+# =========================
+ZIP_FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"  # ID de tu zip en Drive
+ZIP_NAME = "acciones.zip"
+CARPETA_DATOS = "acciones"
+
+# =========================
+# FUNCIONES
+# =========================
+def download_and_extract_zip():
+    """Descarga y extrae el ZIP desde Google Drive"""
+    url = f"https://drive.google.com/uc?id={ZIP_FILE_ID}"
+    output = ZIP_NAME
+    if not os.path.exists(output):
+        gdown.download(url, output, quiet=False)
+
+    if not os.path.exists(CARPETA_DATOS):
+        os.makedirs(CARPETA_DATOS, exist_ok=True)
+        with zipfile.ZipFile(output, "r") as zip_ref:
+            zip_ref.extractall(CARPETA_DATOS)
+
+
+def load_price_data(ticker):
+    """Carga precios de un ticker desde los CSV del ZIP (archivos nombrados solo como ticker.csv)."""
+    file_path = os.path.join(CARPETA_DATOS, f"{ticker}.csv")
+    if not os.path.exists(file_path):
+        st.error(f"❌ No se encontró el archivo para {ticker}")
+        return None
+    try:
+        df = pd.read_csv(file_path)
+        if "Date" not in df.columns or "Adj Close" not in df.columns:
+            st.error(f"⚠️ {ticker}.csv no tiene las columnas necesarias (Date, Adj Close).")
+            return None
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.sort_values("Date")
+        return df[["Date", "Adj Close"]]
+    except Exception as e:
+        st.error(f"Error cargando {ticker}: {e}")
+        return None
+
+
+def calculate_portfolio_performance(weights, mean_returns, cov_matrix):
+    returns = np.sum(mean_returns * weights) * 252
+    risk = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
+    return returns, risk
+
+
+def simulate_portfolios(returns, num_portfolios=10000):
+    mean_returns = returns.mean()
+    cov_matrix = returns.cov()
+    results = {"Return": [], "Risk": [], "Sharpe": [], "Weights": []}
+
+    for _ in range(num_portfolios):
+        weights = np.random.random(len(mean_returns))
+        weights /= np.sum(weights)
+        ret, risk = calculate_portfolio_performance(weights, mean_returns, cov_matrix)
+        sharpe = ret / risk if risk != 0 else 0
+        results["Return"].append(ret)
+        results["Risk"].append(risk)
+        results["Sharpe"].append(sharpe)
+        results["Weights"].append(weights)
+
+    df = pd.DataFrame(results)
+    return df
+
+
+def optimize_portfolio(returns, objective="sharpe"):
+    mean_returns = returns.mean()
+    cov_matrix = returns.cov()
+    num_assets = len(mean_returns)
+
+    def neg_sharpe(weights):
+        ret, risk = calculate_portfolio_performance(weights, mean_returns, cov_matrix)
+        return -(ret / risk)
+
+    def portfolio_volatility(weights):
+        return calculate_portfolio_performance(weights, mean_returns, cov_matrix)[1]
+
+    constraints = ({"type": "eq", "fun": lambda x: np.sum(x) - 1})
+    bounds = tuple((0, 1) for _ in range(num_assets))
+    init_guess = num_assets * [1. / num_assets]
+
+    if objective == "sharpe":
+        result = minimize(neg_sharpe, init_guess, method="SLSQP", bounds=bounds, constraints=constraints)
+    else:  # GMVP
+        result = minimize(portfolio_volatility, init_guess, method="SLSQP", bounds=bounds, constraints=constraints)
+
+    return result.x if result.success else None
+
+
+# =========================
+# INTERFAZ STREAMLIT
+# =========================
+st.title("📊 Página 2 - Simulación de Portafolios")
+
+st.markdown("""
+En esta página podrás cargar tu **CCV** (archivo CSV con la distribución de tu portafolio)  
+y simular los resultados frente al **GMVP** (Global Minimum Variance Portfolio) y el  
+**MaxSharpe** (portafolio con máximo Sharpe).
 """)
 
-# ================================
-# DESCARGA DE EJEMPLO DE CSV
-# ================================
+# Archivo de ejemplo
 ejemplo = pd.DataFrame({
-    "Ticker": ["AAPL", "MSFT", "GOOGL", "AMZN"],
-    "% del Portafolio": [25, 25, 25, 25]
+    "Ticker": ["AAPL", "MSFT", "GOOG"],
+    "% del Portafolio": [0.4, 0.35, 0.25]
 })
-csv_ejemplo = ejemplo.to_csv(index=False)
-
 st.download_button(
-    label="📥 Descargar Ejemplo de CSV",
-    data=csv_ejemplo,
-    file_name="ejemplo_portafolio.csv",
+    label="⬇️ Descargar ejemplo de CCV",
+    data=ejemplo.to_csv(index=False).encode("utf-8"),
+    file_name="ejemplo_ccv.csv",
     mime="text/csv"
 )
 
-# ================================
-# SUBIDA DE ARCHIVO DEL USUARIO
-# ================================
-st.subheader("📤 Sube tu archivo CSV")
-uploaded_file = st.file_uploader(
-    "Selecciona tu archivo CSV con la composición del portafolio", type="csv"
-)
+# Subida de archivo CCV
+ccv_file = st.file_uploader("📂 Sube tu archivo CCV", type=["csv"])
 
-df_user = None
-if uploaded_file is not None:
-    try:
-        df_user = pd.read_csv(uploaded_file)
-        st.success("✅ Archivo cargado correctamente")
-        st.dataframe(df_user)
-    except Exception as e:
-        st.error(f"❌ Error al leer el archivo: {e}")
+if ccv_file:
+    st.success("✅ Archivo cargado correctamente.")
+    user_ccv = pd.read_csv(ccv_file)
 
-# ================================
-# DESCARGA Y CARGA DE DATOS HISTÓRICOS
-# ================================
-st.info("📥 Cargando artefactos precomputados desde Google Drive...")
-
-ZIP_FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"  # <-- tu ZIP real
-ZIP_OUTPUT = "datos_acciones.zip"
-DATA_FOLDER = "acciones"
-
-try:
-    gdown.download(f"https://drive.google.com/uc?id={ZIP_FILE_ID}", ZIP_OUTPUT, quiet=False)
-
-    with zipfile.ZipFile(ZIP_OUTPUT, "r") as zip_ref:
-        zip_ref.extractall(DATA_FOLDER)
-
-    st.success("✅ Datos históricos cargados correctamente")
-except Exception as e:
-    st.error(f"❌ No se pudieron cargar los artefactos precomputados desde Drive: {e}")
-
-# ================================
-# LECTURA DE LOS ARCHIVOS CSV
-# ================================
-dataframes = {}
-if os.path.exists(DATA_FOLDER):
-    for file in os.listdir(DATA_FOLDER):
-        if file.endswith(".csv"):
-            base = file.replace(".csv", "")
-            ticker = base.split("_")[0].upper()  # soporta AAPL.csv o AAPL_2000-01-01_2024-12-31.csv
-
-            file_path = os.path.join(DATA_FOLDER, file)
+    if "Ticker" not in user_ccv.columns or "% del Portafolio" not in user_ccv.columns:
+        st.error("❌ El archivo debe tener columnas: 'Ticker' y '% del Portafolio'")
+    else:
+        if st.button("🚀 Iniciar Simulación"):
             try:
-                df_temp = pd.read_csv(file_path)
-                if "Adj Close" in df_temp.columns:
-                    dataframes[ticker] = df_temp
-                else:
-                    st.warning(f"⚠️ {file} no tiene columna 'Adj Close'.")
-            except Exception as e:
-                st.warning(f"⚠️ No se pudo leer {file}: {e}")
+                download_and_extract_zip()
 
-if dataframes:
-    st.info(f"📂 Tickers cargados: {list(dataframes.keys())[:20]} ... (total: {len(dataframes)})")
-else:
-    st.error("❌ No se encontraron datos históricos en la carpeta extraída.")
+                tickers = user_ccv["Ticker"].tolist()
+                weights = user_ccv["% del Portafolio"].values
 
-# ================================
-# SIMULACIÓN DEL PORTAFOLIO
-# ================================
-if df_user is not None and not df_user.empty:
-    if st.button("🚀 Iniciar Simulación"):
-        try:
-            # Normalizar nombres de columnas
-            df_user.columns = [col.strip().lower() for col in df_user.columns]
-
-            col_ticker = None
-            col_weight = None
-            for col in df_user.columns:
-                if "tick" in col:
-                    col_ticker = col
-                if "por" in col or "%" in col or "weight" in col:
-                    col_weight = col
-
-            if col_ticker is None or col_weight is None:
-                st.error("❌ El CSV debe contener columnas con 'Ticker' y 'Porcentaje'.")
-            else:
                 # Normalizar pesos
-                df_user[col_weight] = df_user[col_weight] / df_user[col_weight].sum()
+                weights = weights / np.sum(weights)
 
-                tickers = df_user[col_ticker].tolist()
-                weights = df_user[col_weight].values
-
-                returns_data = []
+                # Cargar datos históricos
+                prices = {}
                 for ticker in tickers:
-                    if ticker.upper() in dataframes:
-                        df = dataframes[ticker.upper()]
-                        returns = df["Adj Close"].pct_change().dropna()
-                        returns_data.append(returns.reset_index(drop=True))
-                    else:
-                        st.error(f"❌ No se encontraron datos históricos para {ticker}.")
-                        returns_data = []
-                        break
+                    df = load_price_data(ticker)
+                    if df is not None:
+                        prices[ticker] = df.set_index("Date")["Adj Close"]
 
-                if returns_data:
-                    returns_matrix = pd.concat(returns_data, axis=1)
-                    returns_matrix.columns = tickers
+                if len(prices) == 0:
+                    st.error("❌ No se encontraron datos históricos en la carpeta extraída.")
+                else:
+                    data = pd.concat(prices.values(), axis=1)
+                    data.columns = prices.keys()
+                    returns = data.pct_change().dropna()
 
-                    mean_returns = returns_matrix.mean()
-                    cov_matrix = returns_matrix.cov()
+                    # Simulación
+                    sim_results = simulate_portfolios(returns)
 
-                    port_return = np.dot(weights, mean_returns) * 252  # anualizado
-                    port_vol = np.sqrt(np.dot(weights.T, np.dot(cov_matrix * 252, weights)))
+                    # Optimización
+                    max_sharpe_weights = optimize_portfolio(returns, "sharpe")
+                    gmvp_weights = optimize_portfolio(returns, "gmvp")
 
-                    st.subheader("📌 Resultados de tu Portafolio")
-                    st.write(f"**Retorno anual esperado:** {port_return:.2%}")
-                    st.write(f"**Volatilidad anual esperada:** {port_vol:.2%}")
+                    st.subheader("📌 Resultados de la Simulación")
+                    st.write("**Distribución del usuario:**")
+                    st.dataframe(user_ccv)
 
-                    # Guardar resultados
-                    results_df = pd.DataFrame({
-                        "Ticker": tickers,
-                        "% del Portafolio": weights * 100,
-                        "Portafolio": "Usuario"
-                    })
+                    st.write("**Portafolio Máx. Sharpe:**")
+                    st.write(dict(zip(tickers, np.round(max_sharpe_weights, 4))))
 
-                    results_path = "resultado_usuario.csv"
-                    results_df.to_csv(results_path, index=False)
+                    st.write("**Portafolio GMVP:**")
+                    st.write(dict(zip(tickers, np.round(gmvp_weights, 4))))
 
-                    st.download_button(
-                        label="💾 Descargar resultados en CSV",
-                        data=results_df.to_csv(index=False),
-                        file_name="resultado_usuario.csv",
-                        mime="text/csv"
-                    )
+                    st.session_state["user_results"] = {
+                        "tickers": tickers,
+                        "weights": weights,
+                        "max_sharpe": max_sharpe_weights,
+                        "gmvp": gmvp_weights
+                    }
 
-                    st.success("✅ Simulación finalizada. Resultados listos para comparar en Página 3.")
-
-        except Exception as e:
-            st.error(f"❌ Error en la simulación: {e}")
+                    st.success("✅ Simulación finalizada. Puedes avanzar a la página 3.")
+            except Exception as e:
+                st.error(f"❌ Error en la simulación: {e}")
