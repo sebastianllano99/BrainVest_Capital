@@ -9,8 +9,6 @@ import os
 # ================================
 # CONFIGURACIÓN DE LA PÁGINA
 # ================================
-#st.set_page_config(page_title="📄 Página 2 — Simulación de Portafolio", layout="wide")
-
 st.title("📄 Página 2 — Simulación de Portafolio")
 st.write("""
 En esta página podrás **subir tu propio portafolio en formato CSV**, 
@@ -38,7 +36,10 @@ st.download_button(
 # SUBIDA DE ARCHIVO DEL USUARIO
 # ================================
 st.subheader("📤 Sube tu archivo CSV")
-uploaded_file = st.file_uploader("Selecciona tu archivo CSV con la composición del portafolio", type="csv")
+uploaded_file = st.file_uploader(
+    "Selecciona tu archivo CSV con la composición del portafolio", 
+    type="csv"
+)
 
 df_user = None
 if uploaded_file is not None:
@@ -54,16 +55,16 @@ if uploaded_file is not None:
 # ================================
 st.info("📥 Cargando artefactos precomputados desde Google Drive...")
 
-# ID del ZIP en Google Drive
+# ID del ZIP en Google Drive (el que compartiste)
 ZIP_FILE_ID = "1cJFHOWURl7DYEYc4r4SWvAvV3Sl7bZCB"
 ZIP_OUTPUT = "datos_acciones.zip"
 DATA_FOLDER = "acciones"
 
 try:
-    if not os.path.exists(DATA_FOLDER):
-        gdown.download(f"https://drive.google.com/uc?id={ZIP_FILE_ID}", ZIP_OUTPUT, quiet=False)
-        with zipfile.ZipFile(ZIP_OUTPUT, "r") as zip_ref:
-            zip_ref.extractall(DATA_FOLDER)
+    gdown.download(f"https://drive.google.com/uc?id={ZIP_FILE_ID}", ZIP_OUTPUT, quiet=False)
+
+    with zipfile.ZipFile(ZIP_OUTPUT, "r") as zip_ref:
+        zip_ref.extractall(DATA_FOLDER)
 
     st.success("✅ Datos históricos cargados correctamente")
 except Exception as e:
@@ -75,14 +76,13 @@ except Exception as e:
 dataframes = {}
 if os.path.exists(DATA_FOLDER):
     for file in os.listdir(DATA_FOLDER):
-        if file.endswith(".csv"):
-            ticker = file.split("_")[0].upper()  # 👉 extrae solo el ticker
+        if file.endswith(".csv") and "_" in file:
+            # Solo procesar los CSV de acciones con formato: TICKER_fecha_inicio_fecha_fin.csv
+            ticker = file.split("_")[0].upper()
             try:
                 df = pd.read_csv(os.path.join(DATA_FOLDER, file))
                 if "Adj Close" in df.columns:
                     dataframes[ticker] = df
-                else:
-                    st.warning(f"⚠️ {file} no tiene columna 'Adj Close'.")
             except Exception as e:
                 st.warning(f"⚠️ No se pudo cargar {file}: {e}")
 
@@ -92,7 +92,7 @@ if os.path.exists(DATA_FOLDER):
 if df_user is not None and not df_user.empty:
     if st.button("🚀 Iniciar Simulación"):
         try:
-            # Normalizar nombres de columnas del CSV del usuario
+            # Normalizar nombres de columnas
             df_user.columns = [col.strip().lower() for col in df_user.columns]
 
             # Detectar columnas de ticker y pesos
@@ -110,50 +110,46 @@ if df_user is not None and not df_user.empty:
                 # Normalizar pesos
                 df_user[col_weight] = df_user[col_weight] / df_user[col_weight].sum()
 
-                tickers = [t.upper() for t in df_user[col_ticker].tolist()]
+                tickers = df_user[col_ticker].tolist()
                 weights = df_user[col_weight].values
 
                 # Construir matriz de retornos
                 returns_data = []
-                valid_tickers = []
                 for ticker in tickers:
+                    ticker = ticker.upper()
                     if ticker in dataframes:
                         df = dataframes[ticker]
                         returns = df["Adj Close"].pct_change().dropna()
                         returns_data.append(returns)
-                        valid_tickers.append(ticker)
                     else:
                         st.error(f"❌ No se encontraron datos históricos para {ticker}.")
+                        returns_data = []
+                        break
 
                 if returns_data:
                     returns_matrix = pd.concat(returns_data, axis=1)
-                    returns_matrix.columns = valid_tickers
+                    returns_matrix.columns = tickers
 
                     mean_returns = returns_matrix.mean()
                     cov_matrix = returns_matrix.cov()
 
-                    # Retorno y volatilidad del portafolio del usuario
-                    port_return = np.dot(weights[:len(valid_tickers)], mean_returns) * 252  # anualizado
-                    port_vol = np.sqrt(np.dot(weights[:len(valid_tickers)].T,
-                                              np.dot(cov_matrix * 252, weights[:len(valid_tickers)])))
+                    # Cálculo del portafolio
+                    port_return = np.dot(weights, mean_returns) * 252  # anualizado
+                    port_vol = np.sqrt(np.dot(weights.T, np.dot(cov_matrix * 252, weights)))
 
                     st.subheader("📌 Resultados de tu Portafolio")
                     st.write(f"**Retorno anual esperado:** {port_return:.2%}")
                     st.write(f"**Volatilidad anual esperada:** {port_vol:.2%}")
 
-                    # Guardar resultados en session_state
-                    st.session_state["simulacion_resultados"] = {
-                        "user": {"retorno": float(port_return), "riesgo": float(port_vol)},
-                        "acciones": valid_tickers,
-                        "pesos": weights[:len(valid_tickers)].tolist()
-                    }
-
-                    # Exportar resultados
+                    # Guardar resultados
                     results_df = pd.DataFrame({
-                        "Ticker": valid_tickers,
-                        "% del Portafolio": weights[:len(valid_tickers)] * 100,
+                        "Ticker": tickers,
+                        "% del Portafolio": weights * 100,
                         "Portafolio": "Usuario"
                     })
+
+                    results_path = "resultado_usuario.csv"
+                    results_df.to_csv(results_path, index=False)
 
                     st.download_button(
                         label="💾 Descargar resultados en CSV",
@@ -166,4 +162,3 @@ if df_user is not None and not df_user.empty:
 
         except Exception as e:
             st.error(f"❌ Error en la simulación: {e}")
-
