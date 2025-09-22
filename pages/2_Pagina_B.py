@@ -20,6 +20,9 @@ ZIP_FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"   # ZIP que contiene la carpet
 ZIP_NAME = "datos_acciones.zip"
 DATA_FOLDER = "acciones"
 
+# ZIP con artefactos precomputados de Markowitz
+ARTIFACTS_ZIP = "precomputed_artifacts.zip"
+
 # Archivos que vamos a guardar (resultados del usuario)
 RESULT_CSV = "resultado_usuario.csv"
 SUMMARY_CSV = "resultado_usuario_summary.csv"
@@ -47,15 +50,11 @@ def download_zip_from_drive(file_id: str, output: str):
 def ensure_actions_folder():
     """Descarga y extrae ZIP si es necesario. Devuelve True si DATA_FOLDER existe con csv."""
     try:
-        # descargar
         ok = download_zip_from_drive(ZIP_FILE_ID, ZIP_NAME)
         if not ok:
             st.warning("No se pudo descargar el ZIP desde Drive (revisa permisos / id).")
             return False
-
-        # extraer (el ZIP trae la carpeta 'acciones')
         with zipfile.ZipFile(ZIP_NAME, "r") as z:
-            # extraer solo si no existe carpeta
             if not os.path.exists(DATA_FOLDER):
                 z.extractall(".")
         return os.path.exists(DATA_FOLDER)
@@ -67,8 +66,7 @@ def ensure_actions_folder():
         return False
 
 def find_price_file_for_ticker(ticker: str):
-    """Busca en DATA_FOLDER un archivo que empiece por el ticker (case-insensitive).
-       Devuelve ruta o None."""
+    """Busca en DATA_FOLDER un archivo que empiece por el ticker (case-insensitive). Devuelve ruta o None."""
     if not os.path.exists(DATA_FOLDER):
         return None
     ticker_u = ticker.upper()
@@ -88,19 +86,62 @@ def detect_adjcol_and_datecol(df: pd.DataFrame):
         cl = c.lower()
         if cl in ("date", "fecha"):
             date_col = c
-        # detectar possible 'Adj Close' variants
         if "adj" in cl and "close" in cl:
             adj_col = c
         if cl == "close" and adj_col is None:
-            # solo "Close" como fallback si no hay Adj Close
             adj_col = c
-    # si no detectó 'date', intentar columnas con tipo fecha
     if date_col is None:
         for c in df.columns:
             if np.issubdtype(df[c].dtype, np.datetime64):
                 date_col = c
                 break
     return date_col, adj_col
+
+def load_precomputed_artifacts(possible_paths=None):
+    """Carga artefactos precomputados desde un ZIP si existe."""
+    possible_paths = possible_paths or [ARTIFACTS_ZIP]
+    for p in possible_paths:
+        if os.path.exists(p):
+            try:
+                with zipfile.ZipFile(p, "r") as z:
+                    # tickers.csv
+                    if "tickers.csv" in z.namelist():
+                        with z.open("tickers.csv") as f:
+                            tickers_series = pd.read_csv(f, squeeze=True, header=0)
+                            if isinstance(tickers_series, pd.DataFrame):
+                                if "Ticker" in tickers_series.columns:
+                                    tickers_list = tickers_series["Ticker"].astype(str).str.strip().tolist()
+                                else:
+                                    tickers_list = tickers_series.iloc[:,0].astype(str).str.strip().tolist()
+                            else:
+                                tickers_list = tickers_series.astype(str).str.strip().tolist()
+                    else:
+                        tickers_list = None
+
+                    # mean_returns.csv
+                    mean_returns = None
+                    if "mean_returns.csv" in z.namelist():
+                        with z.open("mean_returns.csv") as f:
+                            dfmr = pd.read_csv(f, index_col=0)
+                            if dfmr.shape[1] == 1:
+                                mean_returns = dfmr.iloc[:,0].astype(float)
+                            else:
+                                mean_returns = dfmr.squeeze().astype(float)
+
+                    # covariance.npy
+                    cov = None
+                    if "covariance.npy" in z.namelist():
+                        with z.open("covariance.npy") as f:
+                            cov_bytes = f.read()
+                            cov = np.load(io.BytesIO(cov_bytes))
+
+                    if tickers_list is not None and mean_returns is not None and cov is not None:
+                        mean_returns.index = [str(x).strip().upper() for x in mean_returns.index]
+                        tickers_list = [t.strip().upper() for t in tickers_list]
+                        return tickers_list, mean_returns, cov
+            except Exception as e:
+                print("Error cargando artefactos desde", p, ":", e)
+    return None, None, None
 
 # -----------------------
 # Interfaz
@@ -111,11 +152,11 @@ Sube un CSV con columnas `Ticker` y `% del Portafolio` (o nombres parecidos).
 Al cargar el CSV aparecerá el botón **Iniciar Simulación**. Después de ver resultados, podrás **Finalizar / Guardar**.
 """)
 
-# botón para ejemplo
+# Botón ejemplo CSV
 ejemplo = pd.DataFrame({"Ticker":["AAPL","MSFT","GOOGL"], "% del Portafolio":[40,30,30]})
 st.download_button(" Descargar ejemplo CSV", ejemplo.to_csv(index=False), file_name="ejemplo_portafolio.csv")
 
-# uploader
+# Uploader
 uploaded = st.file_uploader("Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
 if uploaded:
@@ -127,17 +168,17 @@ if uploaded:
         st.error(f"Error leyendo tu CSV: {e}")
         st.stop()
 
-# mostrar tickers disponibles (si ya tenemos carpeta)
+# Mostrar tickers disponibles
 if os.path.exists(DATA_FOLDER):
     tickers_avail = [f[:-4].upper() for f in os.listdir(DATA_FOLDER) if f.lower().endswith(".csv")]
     st.info(f" Tickers disponibles localmente: {len(tickers_avail)} (muestra 20) {tickers_avail[:20]}")
 else:
     st.info(" Aún no se ha descargado/extrado la carpeta 'acciones' con históricos.")
 
-# Mostrar botón Iniciar sólo si CSV cargado
+# Iniciar Simulación
 if df_user is not None:
     if st.button(" Iniciar Simulación"):
-        # detectar columnas
+        # columnas
         cols_lower = [c.strip().lower() for c in df_user.columns]
         col_ticker = None
         col_weight = None
@@ -157,7 +198,7 @@ if df_user is not None:
             else:
                 df_user[col_weight] = df_user[col_weight] / df_user[col_weight].sum()
 
-                # Descargar/extraer ZIP si es necesario
+                # descargar/extraer ZIP históricos
                 ok = ensure_actions_folder()
                 if not ok:
                     st.error(" No hay carpeta 'acciones' con históricos. Revisa el ZIP en Drive.")
@@ -165,72 +206,144 @@ if df_user is not None:
                     tickers = [str(x).strip().upper() for x in df_user[col_ticker].tolist()]
                     weights = df_user[col_weight].values
 
-                    # Cargar series de retornos diarios (index Date)
+                    # Cargar artefactos precomputados
+                    artifact_tickers, artifact_mean_returns, artifact_cov = load_precomputed_artifacts()
+
                     series_list = []
                     missing = []
+                    used_from_artifacts = []
+                    used_from_csv = []
+
                     for t in tickers:
-                        path = find_price_file_for_ticker(t)
+                        t_up = t.strip().upper()
+                        if artifact_tickers and t_up in artifact_tickers:
+                            used_from_artifacts.append(t_up)
+                            continue
+                        path = find_price_file_for_ticker(t_up)
                         if path is None:
-                            missing.append(t)
+                            missing.append(t_up)
                             continue
                         dfp = pd.read_csv(path)
                         date_col, adj_col = detect_adjcol_and_datecol(dfp)
                         if date_col is None or adj_col is None:
-                            missing.append(t)
+                            missing.append(t_up)
                             continue
                         dfp[date_col] = pd.to_datetime(dfp[date_col], errors="coerce")
                         dfp = dfp.dropna(subset=[date_col, adj_col])
                         dfp = dfp.sort_values(date_col)
                         s = dfp.set_index(date_col)[adj_col].pct_change().dropna()
-                        s.name = t
+                        s.name = t_up
                         series_list.append(s)
+                        used_from_csv.append(t_up)
 
-                    if missing:
-                        st.error(f"No se encontraron históricos válidos para: {missing}")
-                    elif len(series_list) == 0:
-                        st.error(" No se pudo construir la matriz de retornos (no hay series válidas).")
-                    else:
-                        returns_df = pd.concat(series_list, axis=1, join="inner").dropna()
-                        if returns_df.shape[1] == 0:
-                            st.error(" No hay solape de fechas entre las series seleccionadas.")
+                    # Si todo se resolvió desde artefactos
+                    if len(series_list) == 0 and len(used_from_artifacts) > 0 and artifact_mean_returns is not None:
+                        not_in_art = [t for t in tickers if t.strip().upper() not in artifact_tickers]
+                        if not_in_art:
+                            st.error(f"No se encontraron históricos válidos para: {not_in_art}")
                         else:
-                            mean_returns = returns_df.mean()           # diario
-                            cov_matrix = returns_df.cov()              # diario
+                            sel = [t.strip().upper() for t in tickers]
+                            mu_sel = artifact_mean_returns.loc[sel].astype(float).values
+                            idx_map = {tk:i for i,tk in enumerate(artifact_tickers)}
+                            sel_idx = [idx_map[t] for t in sel]
+                            cov_sel = artifact_cov[np.ix_(sel_idx, sel_idx)]
+                            weights_arr = np.array(weights, dtype=float)
+                            port_ret_ann = float(np.dot(weights_arr, mu_sel) * 252)
+                            port_vol_ann = float(np.sqrt(np.dot(weights_arr.T, np.dot(cov_sel * 252, weights_arr))))
 
-                            # cálculo portafolio usuario (anualizado)
-                            port_ret_ann = float(np.dot(weights, mean_returns) * 252)
-                            port_vol_ann = float(np.sqrt(np.dot(weights.T, np.dot(cov_matrix * 252, weights))))
-
-                            st.subheader(" Resultados de simulación (Usuario)")
+                            st.subheader(" Resultados de simulación (Usuario) — desde artefactos precomputados")
                             st.write(f"- Retorno anual esperado: **{port_ret_ann:.2%}**")
                             st.write(f"- Volatilidad anual esperada: **{port_vol_ann:.2%}**")
-
-                            # mostrar distribución
                             distrib = pd.DataFrame({
                                 "Ticker": tickers,
-                                "% del Portafolio": (weights * 100).round(6),
+                                "% del Portafolio": (weights_arr * 100).round(6),
                                 "Portafolio": "Usuario"
                             })
                             st.dataframe(distrib)
 
-                            # permitir finalizar/guardar
                             if st.button(" Finalizar y Guardar Resultados"):
-                                # guardar archivo con composición
                                 distrib.to_csv(RESULT_CSV, index=False, encoding="utf-8-sig")
-                                # guardar resumen con métricas para Página 3
                                 resumen = pd.DataFrame([{
                                     "Portafolio": "Usuario",
                                     "Retorno Anual": port_ret_ann,
                                     "Riesgo Anual": port_vol_ann
                                 }])
                                 resumen.to_csv(SUMMARY_CSV, index=False, encoding="utf-8-sig")
-
-                                # guardar en session_state
                                 st.session_state["last_sim"] = {
                                     "tickers": tickers,
-                                    "weights": list(weights),
+                                    "weights": list(weights_arr),
                                     "retorno_anual": port_ret_ann,
                                     "riesgo_anual": port_vol_ann
                                 }
                                 st.success(f"Resultados guardados: {RESULT_CSV} y {SUMMARY_CSV}")
+                        st.stop()
 
+                    # Si mezcla o solo CSV
+                    if len(series_list) == 0:
+                        st.error(f"No se pudieron cargar series válidas. Faltantes: {missing}")
+                    else:
+                        returns_df = pd.concat(series_list, axis=1, join="inner").dropna()
+                        if returns_df.shape[1] == 0:
+                            st.error(" No hay solape de fechas entre las series seleccionadas.")
+                        else:
+                            # combinar artefactos + csv si es necesario
+                            final_tickers = [t.strip().upper() for t in tickers if (t.strip().upper() in used_from_csv) or (t.strip().upper() in used_from_artifacts)]
+                            mu_from_csv = returns_df.mean().rename(lambda x: x.strip().upper())
+                            mu_list = []
+                            for tname in final_tickers:
+                                if tname in mu_from_csv.index:
+                                    mu_list.append(mu_from_csv.loc[tname])
+                                else:
+                                    mu_list.append(artifact_mean_returns.loc[tname])
+                            mu_comb = np.array(mu_list, dtype=float)
+                            n = len(final_tickers)
+                            cov_comb = np.zeros((n,n), dtype=float)
+                            for i,ti in enumerate(final_tickers):
+                                for j,tj in enumerate(final_tickers):
+                                    if ti in returns_df.columns and tj in returns_df.columns:
+                                        cov_comb[i,j] = returns_df[[ti,tj]].cov().iloc[0,1] if ti != tj else returns_df[ti].var()
+                                    elif ti in returns_df.columns and tj not in returns_df.columns:
+                                        if artifact_tickers and ti in artifact_tickers and tj in artifact_tickers:
+                                            idx_map = {tk:i for i,tk in enumerate(artifact_tickers)}
+                                            cov_comb[i,j] = artifact_cov[idx_map[ti], idx_map[tj]]
+                                        else:
+                                            cov_comb[i,j] = 0.0
+                                    elif ti not in returns_df.columns and tj in returns_df.columns:
+                                        if artifact_tickers and ti in artifact_tickers and tj in artifact_tickers:
+                                            idx_map = {tk:i for i,tk in enumerate(artifact_tickers)}
+                                            cov_comb[i,j] = artifact_cov[idx_map[ti], idx_map[tj]]
+                                        else:
+                                            cov_comb[i,j] = 0.0
+                                    else:
+                                        idx_map = {tk:i for i,tk in enumerate(artifact_tickers)}
+                                        cov_comb[i,j] = artifact_cov[idx_map[ti], idx_map[tj]]
+                            peso_map = {tt.strip().upper(): w for tt,w in zip(tickers, weights)}
+                            weights_aligned = np.array([peso_map[tk] for tk in final_tickers], dtype=float)
+                            port_ret_ann = float(np.dot(weights_aligned, mu_comb) * 252)
+                            port_vol_ann = float(np.sqrt(np.dot(weights_aligned.T, np.dot(cov_comb * 252, weights_aligned))))
+
+                            st.subheader(" Resultados de simulación (Usuario)")
+                            st.write(f"- Retorno anual esperado: **{port_ret_ann:.2%}**")
+                            st.write(f"- Volatilidad anual esperada: **{port_vol_ann:.2%}**")
+                            distrib = pd.DataFrame({
+                                "Ticker": final_tickers,
+                                "% del Portafolio": (weights_aligned * 100).round(6),
+                                "Portafolio": "Usuario"
+                            })
+                            st.dataframe(distrib)
+
+                            if st.button(" Finalizar y Guardar Resultados"):
+                                distrib.to_csv(RESULT_CSV, index=False, encoding="utf-8-sig")
+                                resumen = pd.DataFrame([{
+                                    "Portafolio": "Usuario",
+                                    "Retorno Anual": port_ret_ann,
+                                    "Riesgo Anual": port_vol_ann
+                                }])
+                                resumen.to_csv(SUMMARY_CSV, index=False, encoding="utf-8-sig")
+                                st.session_state["last_sim"] = {
+                                    "tickers": final_tickers,
+                                    "weights": list(weights_aligned),
+                                    "retorno_anual": port_ret_ann,
+                                    "riesgo_anual": port_vol_ann
+                                }
+                                st.success(f"Resultados guardados: {RESULT_CSV} y {SUMMARY_CSV}")
