@@ -16,9 +16,15 @@ except Exception:
 # -----------------------
 # Configuración: IDs / rutas
 # -----------------------
-ZIP_FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"   # ZIP que contiene la carpeta 'acciones'
-ZIP_NAME = "datos_acciones.zip"
-DATA_FOLDER = "acciones"
+# ZIP con resultados precomputados Markowitz
+ZIP_REPORT_ID = "1cJFHOWURl7DYEYc4r4SWvAvV3Sl7bZCB"
+ZIP_REPORT_NAME = "report_markowitz.zip"
+REPORT_FOLDER = "report_markowitz"
+
+# ZIP con históricos de acciones
+ZIP_ACTIONS_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"
+ZIP_ACTIONS_NAME = "datos_acciones.zip"
+ACTIONS_FOLDER = "acciones"
 
 # Archivos que vamos a guardar (resultados del usuario)
 RESULT_CSV = "resultado_usuario.csv"
@@ -44,42 +50,38 @@ def download_zip_from_drive(file_id: str, output: str):
             return True
         return False
 
-def ensure_actions_folder():
-    """Descarga y extrae ZIP si es necesario. Devuelve True si DATA_FOLDER existe con csv."""
+def ensure_folder_from_zip(file_id, zip_name, folder_name):
+    """Descarga y extrae ZIP si es necesario. Devuelve True si hay CSV dentro."""
     try:
-        ok = download_zip_from_drive(ZIP_FILE_ID, ZIP_NAME)
+        ok = download_zip_from_drive(file_id, zip_name)
         if not ok:
-            st.warning("No se pudo descargar el ZIP desde Drive (revisa permisos / id).")
+            st.warning(f"No se pudo descargar el ZIP {zip_name} desde Drive.")
             return False
 
-        # Extraer todos los CSV a DATA_FOLDER directamente
-        if not os.path.exists(DATA_FOLDER):
-            os.makedirs(DATA_FOLDER, exist_ok=True)
-            with zipfile.ZipFile(ZIP_NAME, "r") as z:
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name, exist_ok=True)
+            with zipfile.ZipFile(zip_name, "r") as z:
                 for f in z.namelist():
-                    if f.lower().endswith(".csv"):
-                        z.extract(f, DATA_FOLDER)
+                    if f.lower().endswith(".csv") or f.lower().endswith(".npy"):
+                        z.extract(f, folder_name)
         # Comprobar si hay CSV dentro
-        csv_files = [f for f in os.listdir(DATA_FOLDER) if f.lower().endswith(".csv")]
+        csv_files = [f for f in os.listdir(folder_name) if f.lower().endswith(".csv")]
         return len(csv_files) > 0
     except zipfile.BadZipFile:
-        st.error("❌ Archivo ZIP descargado inválido (BadZipFile).")
+        st.error(f"❌ Archivo ZIP {zip_name} inválido (BadZipFile).")
         return False
     except Exception as e:
-        st.error(f"❌ Error extrayendo/leyendo ZIP: {e}")
+        st.error(f"❌ Error extrayendo/leyendo ZIP {zip_name}: {e}")
         return False
 
 def find_price_file_for_ticker(ticker: str):
-    """Busca en DATA_FOLDER un archivo que empiece por el ticker (case-insensitive)."""
-    if not os.path.exists(DATA_FOLDER):
+    """Busca CSV en carpeta de históricos que coincida con ticker exacto."""
+    if not os.path.exists(ACTIONS_FOLDER):
         return None
     ticker_u = ticker.upper()
-    for f in os.listdir(DATA_FOLDER):
-        if not f.lower().endswith(".csv"):
-            continue
-        base = f[:-4]
-        if base.upper() == ticker_u:  # Igual exacto al ticker
-            return os.path.join(DATA_FOLDER, f)
+    for f in os.listdir(ACTIONS_FOLDER):
+        if f.lower().endswith(".csv") and f[:-4].upper() == ticker_u:
+            return os.path.join(ACTIONS_FOLDER, f)
     return None
 
 def detect_adjcol_and_datecol(df: pd.DataFrame):
@@ -104,17 +106,17 @@ def detect_adjcol_and_datecol(df: pd.DataFrame):
 # -----------------------
 # Interfaz
 # -----------------------
-st.title("Página 2 — Simulación de Portafolio")
+st.title("Simulación de Portafolio — Markowitz")
 st.write("""
-Sube un CSV con columnas `Ticker` y `% del Portafolio` (o nombres parecidos).  
-Al cargar el CSV aparecerá el botón **Iniciar Simulación**. Después de ver resultados, podrás **Finalizar / Guardar**.
+Sube un CSV con columnas `Ticker` y `% del Portafolio`.  
+Al cargarlo aparecerá el botón **Iniciar Simulación**.
 """)
 
-# botón para ejemplo
+# Botón para ejemplo
 ejemplo = pd.DataFrame({"Ticker":["AAPL","MSFT","GOOGL"], "% del Portafolio":[40,30,30]})
 st.download_button(" Descargar ejemplo CSV", ejemplo.to_csv(index=False), file_name="ejemplo_portafolio.csv")
 
-# uploader
+# Subida de CSV del usuario
 uploaded = st.file_uploader("Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
 if uploaded:
@@ -126,19 +128,26 @@ if uploaded:
         st.error(f"Error leyendo tu CSV: {e}")
         st.stop()
 
+# Descargar y extraer ZIPs si no existen
+ok_report = ensure_folder_from_zip(ZIP_REPORT_ID, ZIP_REPORT_NAME, REPORT_FOLDER)
+ok_actions = ensure_folder_from_zip(ZIP_ACTIONS_ID, ZIP_ACTIONS_NAME, ACTIONS_FOLDER)
+
+if not ok_actions:
+    st.warning("No se pudieron cargar los históricos de acciones. Verifica el ZIP de acciones.")
+if not ok_report:
+    st.warning("No se pudieron cargar los resultados precomputados de Markowitz. Verifica el ZIP de reportes.")
+
 # Mostrar tickers disponibles
-if os.path.exists(DATA_FOLDER):
-    tickers_avail = [f[:-4].upper() for f in os.listdir(DATA_FOLDER) if f.lower().endswith(".csv")]
-    st.info(f" Tickers disponibles localmente: {len(tickers_avail)} (muestra 20) {tickers_avail[:20]}")
-else:
-    st.info(" Aún no se ha descargado/extrado la carpeta 'acciones' con históricos.")
+if os.path.exists(ACTIONS_FOLDER):
+    tickers_avail = [f[:-4].upper() for f in os.listdir(ACTIONS_FOLDER) if f.lower().endswith(".csv")]
+    st.info(f" Tickers disponibles: {len(tickers_avail)} (muestra 20) {tickers_avail[:20]}")
 
 # -----------------------
-# Simulación
+# Simulación del portafolio del usuario
 # -----------------------
-if df_user is not None:
+if df_user is not None and ok_actions:
     if st.button(" Iniciar Simulación"):
-        # detectar columnas
+        # Detectar columnas
         cols_lower = [c.strip().lower() for c in df_user.columns]
         col_ticker = None
         col_weight = None
@@ -149,84 +158,80 @@ if df_user is not None:
                 col_weight = c_orig
 
         if col_ticker is None or col_weight is None:
-            st.error(" Tu CSV debe tener columnas con Ticker y con el % (ej. '% del Portafolio' o 'Peso').")
+            st.error("Tu CSV debe tener columnas con Ticker y % del Portafolio.")
         else:
             # Normalizar pesos
             df_user[col_weight] = pd.to_numeric(df_user[col_weight], errors="coerce")
             if df_user[col_weight].isnull().any():
-                st.error(" Algunos pesos no son numéricos.")
+                st.error("Algunos pesos no son numéricos.")
             else:
                 df_user[col_weight] = df_user[col_weight] / df_user[col_weight].sum()
 
-                # Descargar/extraer ZIP si es necesario
-                ok = ensure_actions_folder()
-                if not ok:
-                    st.error(" No hay carpeta 'acciones' con históricos. Revisa el ZIP en Drive.")
+                tickers = [str(x).strip().upper() for x in df_user[col_ticker].tolist()]
+                weights = df_user[col_weight].values
+
+                # Cargar series históricas
+                series_list = []
+                missing = []
+                for t in tickers:
+                    path = find_price_file_for_ticker(t)
+                    if path is None:
+                        missing.append(t)
+                        continue
+                    dfp = pd.read_csv(path)
+                    date_col, adj_col = detect_adjcol_and_datecol(dfp)
+                    if date_col is None or adj_col is None:
+                        missing.append(t)
+                        continue
+                    dfp[date_col] = pd.to_datetime(dfp[date_col], errors="coerce")
+                    dfp = dfp.dropna(subset=[date_col, adj_col])
+                    dfp = dfp.sort_values(date_col)
+                    s = dfp.set_index(date_col)[adj_col].pct_change().dropna()
+                    s.name = t
+                    series_list.append(s)
+
+                if missing:
+                    st.error(f"No se pudieron cargar series válidas. Faltantes: {missing}")
+                elif len(series_list) == 0:
+                    st.error("No hay series válidas para construir la matriz de retornos.")
                 else:
-                    tickers = [str(x).strip().upper() for x in df_user[col_ticker].tolist()]
-                    weights = df_user[col_weight].values
-
-                    # Cargar series de retornos diarios
-                    series_list = []
-                    missing = []
-                    for t in tickers:
-                        path = find_price_file_for_ticker(t)
-                        if path is None:
-                            missing.append(t)
-                            continue
-                        dfp = pd.read_csv(path)
-                        date_col, adj_col = detect_adjcol_and_datecol(dfp)
-                        if date_col is None or adj_col is None:
-                            missing.append(t)
-                            continue
-                        dfp[date_col] = pd.to_datetime(dfp[date_col], errors="coerce")
-                        dfp = dfp.dropna(subset=[date_col, adj_col])
-                        dfp = dfp.sort_values(date_col)
-                        s = dfp.set_index(date_col)[adj_col].pct_change().dropna()
-                        s.name = t
-                        series_list.append(s)
-
-                    if missing:
-                        st.error(f"No se pudieron cargar series válidas. Faltantes: {missing}")
-                    elif len(series_list) == 0:
-                        st.error("No hay series válidas para construir la matriz de retornos.")
+                    returns_df = pd.concat(series_list, axis=1, join="inner").dropna()
+                    if returns_df.shape[1] == 0:
+                        st.error("No hay solape de fechas entre las series seleccionadas.")
                     else:
-                        returns_df = pd.concat(series_list, axis=1, join="inner").dropna()
-                        if returns_df.shape[1] == 0:
-                            st.error("No hay solape de fechas entre las series seleccionadas.")
-                        else:
-                            mean_returns = returns_df.mean()           # diario
-                            cov_matrix = returns_df.cov()              # diario
+                        mean_returns = returns_df.mean()           # diario
+                        cov_matrix = returns_df.cov()              # diario
 
-                            # cálculo portafolio usuario (anualizado)
-                            port_ret_ann = float(np.dot(weights, mean_returns) * 252)
-                            port_vol_ann = float(np.sqrt(np.dot(weights.T, np.dot(cov_matrix * 252, weights))))
+                        # Cálculo portafolio usuario (anualizado)
+                        port_ret_ann = float(np.dot(weights, mean_returns) * 252)
+                        port_vol_ann = float(np.sqrt(np.dot(weights.T, np.dot(cov_matrix * 252, weights))))
 
-                            st.subheader(" Resultados de simulación (Usuario)")
-                            st.write(f"- Retorno anual esperado: **{port_ret_ann:.2%}**")
-                            st.write(f"- Volatilidad anual esperada: **{port_vol_ann:.2%}**")
+                        st.subheader("Resultados de simulación (Usuario)")
+                        st.write(f"- Retorno anual esperado: **{port_ret_ann:.2%}**")
+                        st.write(f"- Volatilidad anual esperada: **{port_vol_ann:.2%}**")
 
-                            # mostrar distribución
-                            distrib = pd.DataFrame({
-                                "Ticker": tickers,
-                                "% del Portafolio": (weights * 100).round(6),
-                                "Portafolio": "Usuario"
-                            })
-                            st.dataframe(distrib)
+                        # Mostrar distribución
+                        distrib = pd.DataFrame({
+                            "Ticker": tickers,
+                            "% del Portafolio": (weights * 100).round(6),
+                            "Portafolio": "Usuario"
+                        })
+                        st.dataframe(distrib)
 
-                            # permitir finalizar/guardar
-                            if st.button(" Finalizar y Guardar Resultados"):
-                                distrib.to_csv(RESULT_CSV, index=False, encoding="utf-8-sig")
-                                resumen = pd.DataFrame([{
-                                    "Portafolio": "Usuario",
-                                    "Retorno Anual": port_ret_ann,
-                                    "Riesgo Anual": port_vol_ann
-                                }])
-                                resumen.to_csv(SUMMARY_CSV, index=False, encoding="utf-8-sig")
-                                st.session_state["last_sim"] = {
-                                    "tickers": tickers,
-                                    "weights": list(weights),
-                                    "retorno_anual": port_ret_ann,
-                                    "riesgo_anual": port_vol_ann
-                                }
-                                st.success(f"Resultados guardados: {RESULT_CSV} y {SUMMARY_CSV}")
+                        # Guardar resultados
+                        if st.button(" Finalizar y Guardar Resultados"):
+                            distrib.to_csv(RESULT_CSV, index=False, encoding="utf-8-sig")
+                            resumen = pd.DataFrame([{
+                                "Portafolio": "Usuario",
+                                "Retorno Anual": port_ret_ann,
+                                "Riesgo Anual": port_vol_ann
+                            }])
+                            resumen.to_csv(SUMMARY_CSV, index=False, encoding="utf-8-sig")
+
+                            st.session_state["last_sim"] = {
+                                "tickers": tickers,
+                                "weights": list(weights),
+                                "retorno_anual": port_ret_ann,
+                                "riesgo_anual": port_vol_ann
+                            }
+                            st.success(f"Resultados guardados: {RESULT_CSV} y {SUMMARY_CSV}")
