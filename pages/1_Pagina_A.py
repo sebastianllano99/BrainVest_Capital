@@ -6,12 +6,12 @@ import plotly.graph_objects as go
 import zipfile
 import datetime
 import gdown
-import io
-import shutil
 
+# ================================
 # CONFIGURACIÓN DE DATOS
-ZIP_FILE_ID = "1UrY3VOcpirbthISl0bnve6E8OP_-3vym"
-CARPETA_DATOS = "acciones´_procesadas"
+# ================================
+ZIP_FILE_ID = "1UrY3VOcpirbthISl0bnve6E8OP_-3vym"  # ID de tu nuevo zip en Drive
+CARPETA_DATOS = "acciones_procesadas"
 ZIP_NAME = "acciones_procesadas.zip"
 
 def download_and_unzip():
@@ -24,7 +24,9 @@ def download_and_unzip():
 if not os.path.exists(CARPETA_DATOS) or len(os.listdir(CARPETA_DATOS)) == 0:
     download_and_unzip()
 
-# Buscar CSV en la carpeta
+# ================================
+# CARGA DE ARCHIVOS
+# ================================
 archivos = []
 for root, _, files in os.walk(CARPETA_DATOS):
     for f in files:
@@ -42,27 +44,32 @@ tickers = {}
 for f in archivos:
     nombre = os.path.splitext(os.path.basename(f))[0]
     nombre = nombre.split("_")[0]
-    tickers[nombre] = f
+    if nombre not in tickers:  # evita duplicados
+        tickers[nombre] = f
 
-# ===== BOTÓN DESCARGA MASIVA =====
+# ================================
+# BOTÓN DESCARGA MASIVA
+# ================================
 st.sidebar.subheader("📦 Descargar datos")
-zip_buffer = io.BytesIO()
-with zipfile.ZipFile(zip_buffer, "w") as zf:
-    for archivo in archivos:
-        zf.write(archivo, os.path.basename(archivo))  # guarda cada CSV en el ZIP
-zip_buffer.seek(0)
-st.sidebar.download_button(
-    label="⬇️ Descargar todos los históricos (ZIP)",
-    data=zip_buffer,
-    file_name="historicos_acciones.zip",
-    mime="application/zip"
-)
 
-# ===== NAVEGACIÓN =====
+# usamos directamente el archivo original descargado de Drive
+with open(ZIP_NAME, "rb") as f:
+    st.sidebar.download_button(
+        label="⬇️ Descargar todos los históricos (ZIP)",
+        data=f,
+        file_name="historicos_acciones.zip",
+        mime="application/zip"
+    )
+
+# ================================
+# NAVEGACIÓN
+# ================================
 st.sidebar.title("📊 Navegación")
 pagina = st.sidebar.radio("Selecciona una página:", ["Análisis Histórico"])
 
-# ===== PÁGINA DE ANÁLISIS HISTÓRICO =====
+# ================================
+# PÁGINA DE ANÁLISIS HISTÓRICO
+# ================================
 if pagina == "Análisis Histórico":
     st.title("📈 Visualización de Históricos de Empresas")
 
@@ -72,20 +79,24 @@ if pagina == "Análisis Histórico":
     ruta = tickers[ticker]
     df = pd.read_csv(ruta)
 
-    # Formateo y filtro hasta 2023
+    # Formateo de fechas
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df = df.sort_values(by="Date")
-    df = df[df["Date"] <= "2023-12-31"]  # 🔥 filtro solo hasta 2023
 
+    # Retornos
     if "Return" not in df.columns:
         df["Return"] = df["Adj Close"].pct_change() * 100
     df["Cumulative Return"] = (1 + df["Return"] / 100).cumprod() - 1
 
-    # Tabla
+    # ================================
+    # TABLA
+    # ================================
     st.subheader(f"📋 Datos históricos - {ticker}")
     st.dataframe(df, use_container_width=True, height=400)
 
-    # Colores y estilo
+    # ================================
+    # COLORES Y ESTILO
+    # ================================
     fondo = "#0d1b2a"
     texto = "#e0e1dd"
     verde = "#00ff7f"
@@ -110,7 +121,9 @@ if pagina == "Análisis Histórico":
             color=texto
         )
 
-    # Precio
+    # ================================
+    # GRÁFICO DE PRECIOS
+    # ================================
     st.subheader("💹 Evolución del Precio Ajustado (Adj Close)")
     fig_price = px.line(df, x="Date", y="Adj Close",
                         title=f"Evolución histórica de {ticker}",
@@ -120,7 +133,9 @@ if pagina == "Análisis Histórico":
     fig_price.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_price, use_container_width=True)
 
-    # Volumen
+    # ================================
+    # GRÁFICO DE VOLUMEN
+    # ================================
     st.subheader("📊 Volumen de Transacciones")
     opcion_vol = st.selectbox("Frecuencia del volumen", ["Diario", "Semanal", "Mensual"])
     df_vol = df.copy()
@@ -136,7 +151,9 @@ if pagina == "Análisis Histórico":
     fig_vol.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_vol, use_container_width=True)
 
-    # Retornos
+    # ================================
+    # GRÁFICO DE RETORNOS
+    # ================================
     st.subheader("📉 Retornos de la Acción")
     opcion_ret = st.selectbox("Frecuencia de retornos", ["Diario", "Semanal", "Mensual"])
     df_ret = df.copy()
@@ -146,6 +163,7 @@ if pagina == "Análisis Histórico":
     elif opcion_ret == "Mensual":
         df_ret = df.resample("M", on="Date").agg(
             {"Return": "mean", "Cumulative Return": "last"}).reset_index()
+
     fig_ret = go.Figure()
     fig_ret.add_trace(go.Scatter(x=df_ret["Date"], y=df_ret["Return"],
                                  mode="lines", name="Retorno (%)",
@@ -155,4 +173,3 @@ if pagina == "Análisis Histórico":
                                  line=dict(color=azul, width=3)))
     fig_ret.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_ret, use_container_width=True)
-
