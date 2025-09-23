@@ -10,9 +10,9 @@ import io
 import shutil
 
 # CONFIGURACIÓN DE DATOS
-ZIP_FILE_ID = "1Tm2vRpHYbPNUGDVxU4cRbXpYGH_uasW_"
-CARPETA_DATOS = "acciones"
-ZIP_NAME = "acciones.zip"
+ZIP_FILE_ID = "1UrY3VOcpirbthISl0bnve6E8OP_-3vym"
+CARPETA_DATOS = "acciones´_procesadas"
+ZIP_NAME = "acciones_procesadas.zip"
 
 def download_and_unzip():
     url = f"https://drive.google.com/uc?export=download&id={ZIP_FILE_ID}"
@@ -155,3 +155,4 @@ if pagina == "Análisis Histórico":
                                  line=dict(color=azul, width=3)))
     fig_ret.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_ret, use_container_width=True)
+
