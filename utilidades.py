@@ -1,4 +1,3 @@
-# utilidades.py
 import streamlit as st
 
 def aplicar_estilos(hide_streamlit_nav=True):
@@ -12,9 +11,12 @@ def aplicar_estilos(hide_streamlit_nav=True):
     section[data-testid="stSidebarNav"], div[data-testid="stSidebarNav"] { display: none !important; }
 
     /* Oculta la toolbar / botón de páginas (top-right) si existe */
-    div[data-testid="stToolbar"], header[data-testid="stHeader"], button[data-testid="stToolbarButton"], button[aria-label="Toggle navigation"] { display: none !important; }
+    div[data-testid="stToolbar"], header[data-testid="stHeader"], 
+    button[data-testid="stToolbarButton"], button[aria-label="Toggle navigation"] { 
+        display: none !important; 
+    }
 
-    /* Ajustes visuales pequeños que ya tenías */
+    /* Ajustes visuales pequeños */
     .css-1d391kg { padding-top: 10px; }
     </style>
     """
@@ -60,9 +62,3 @@ def generarMenu_horizontal():
     with cols[3]:
         if st.button("Mi portafolio"):
             st.session_state["current_page"] = "pagina_c"
-   
-
-
-
-
-
