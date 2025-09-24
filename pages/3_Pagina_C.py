@@ -1,10 +1,10 @@
+# 3_Pagina_C.py
 import streamlit as st
 import pandas as pd
 import numpy as np
 import os
 import zipfile
 import gdown
-import sqlite3
 
 # -----------------------
 # Configuración
@@ -14,9 +14,8 @@ ZIP_URL = "https://drive.google.com/uc?id=1sgshq-1MLrO1oToV8uu-iM4SPnvgT149"
 ZIP_NAME = "acciones_2024.zip"
 CARPETA_DATOS = "Acciones_2024"
 
-# Conexión a DB de login para obtener nombre de grupo
-conn = sqlite3.connect("jugadores.db")
-c = conn.cursor()
+# Obtener el nombre del grupo desde el login
+nombre_grupo = st.session_state.get("username", "Grupo_Anonimo")
 
 # -----------------------
 # Interfaz
@@ -24,7 +23,7 @@ c = conn.cursor()
 st.title("Simulación de Portafolio")
 
 st.write("""
-Sube un CSV con columnas `Ticker` y `% del Portafolio`.  
+Sube un CSV con columnas `Ticker` y `% del Portafolio`.
 Puedes descargar el ejemplo para guiarte en el formato correcto.
 """)
 
@@ -42,9 +41,6 @@ st.download_button(
 # Subida CSV usuario
 uploaded = st.file_uploader("📂 Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
-
-# Obtener nombre de grupo desde login
-nombre_grupo = st.session_state.get("username", "Grupo_Anonimo")
 
 if uploaded:
     try:
@@ -79,8 +75,8 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
         if os.path.exists(file_path):
             df_ticker = pd.read_csv(file_path, parse_dates=['Date']).sort_values('Date')
             df_ticker = df_ticker.set_index('Date')
-            precios[ticker] = df_ticker['Close']
-            primer_dia_precios[ticker] = df_ticker['Open'].iloc[0]
+            precios[ticker] = df_ticker['Close']  # Precios diarios
+            primer_dia_precios[ticker] = df_ticker['Open'].iloc[0]  # Precio de apertura primer día
             tickers_validos.append(ticker)
         else:
             st.warning(f"⚠️ No se encontró archivo para {ticker}, se ignorará.")
@@ -88,42 +84,22 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
     if not precios:
         st.error("❌ No hay tickers válidos para simular.")
     else:
+        # DataFrame de precios alineado
         df_precios = pd.DataFrame(precios)
         df_user = df_user[df_user['Ticker'].isin(tickers_validos)].reset_index(drop=True)
 
-        # -----------------------
-        # Paso 3: Calcular distribución monetaria
-        # -----------------------
-        df_user['Monto Invertido'] = (df_user["% del Portafolio"] / 100) * CAPITAL_INICIAL
-        df_user['Cantidad Acciones'] = df_user.apply(
-            lambda row: row['Monto Invertido'] / primer_dia_precios[row['Ticker']], axis=1
-        )
+        # Paso 3: Calcular monto invertido y cantidad de acciones (enteros)
+        df_user['Monto Destinado'] = (df_user["% del Portafolio"] / 100) * CAPITAL_INICIAL
+        df_user['Cantidad Acciones'] = (df_user['Monto Destinado'] / df_user['Ticker'].map(primer_dia_precios)).apply(np.floor)
+        df_user['Monto Real Invertido'] = df_user['Cantidad Acciones'] * df_user['Ticker'].map(primer_dia_precios)
 
-        st.subheader("💰 Distribución Monetaria por Acción")
-        df_dist = df_user[['Ticker', '% del Portafolio', 'Monto Invertido', 'Cantidad Acciones']].copy()
-        df_dist = df_dist.rename(columns={"% del Portafolio": "Porcentaje Portafolio"})
-        st.dataframe(df_dist)
+        # Paso 4: Calcular valor diario de cada acción
+        valores_diarios = df_precios * df_user['Cantidad Acciones'].values
+        df_valores_diarios = valores_diarios.copy()
+        df_valores_diarios['Suma Diaria Portafolio'] = df_valores_diarios.sum(axis=1)
 
-        # -----------------------
-        # Paso 4: Valor diario del portafolio
-        # -----------------------
-        valores_diarios_accion = df_precios * df_user['Cantidad Acciones'].values
-        df_portafolio = valores_diarios_accion.sum(axis=1)
-
-        st.subheader("📊 Valor Diario de Cada Acción")
-        st.write("Valor diario de cada acción según la cantidad de acciones compradas.")
-        st.dataframe(valores_diarios_accion)
-
-        # -----------------------
-        # Paso 5: Ganancia / Pérdida diaria
-        # -----------------------
-        ganancia_perdida_accion = valores_diarios_accion - df_user['Monto Invertido'].values
-        st.subheader("📈 Ganancia/Pérdida Diaria por Acción")
-        st.dataframe(ganancia_perdida_accion)
-
-        # -----------------------
-        # Paso 6: Métricas del portafolio
-        # -----------------------
+        # Paso 5: Calcular métricas
+        df_portafolio = df_valores_diarios['Suma Diaria Portafolio']
         retornos_diarios = df_portafolio.pct_change().fillna(0)
         rent_anual = (1 + retornos_diarios.mean())**252 - 1
         riesgo_anual = retornos_diarios.std() * np.sqrt(252)
@@ -132,11 +108,13 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
         dias_arriba = (df_portafolio > CAPITAL_INICIAL).sum()
         dias_abajo = (df_portafolio <= CAPITAL_INICIAL).sum()
 
-        # Ganancia promedio días arriba y pérdida promedio días abajo
-        ganancia_promedio_arriba = (df_portafolio[df_portafolio > CAPITAL_INICIAL] - CAPITAL_INICIAL).mean() if dias_arriba>0 else 0
-        perdida_promedio_abajo = (df_portafolio[df_portafolio <= CAPITAL_INICIAL] - CAPITAL_INICIAL).mean() if dias_abajo>0 else 0
+        ganancia_promedio_arriba = ((df_portafolio[df_portafolio > CAPITAL_INICIAL] - CAPITAL_INICIAL).mean() 
+                                    if dias_arriba > 0 else 0)
+        perdida_promedio_abajo = ((CAPITAL_INICIAL - df_portafolio[df_portafolio <= CAPITAL_INICIAL]).mean() 
+                                  if dias_abajo > 0 else 0)
         ganancia_total = df_portafolio.iloc[-1] - CAPITAL_INICIAL
 
+        # Paso 6: Mostrar resultados
         resultados = pd.DataFrame({
             "Grupo": [nombre_grupo],
             "Rentabilidad Anualizada": [rent_anual],
@@ -150,14 +128,16 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
         })
 
         st.subheader("📈 Resultados del Portafolio")
-        st.dataframe(resultados)
+        st.dataframe(resultados.style.format("{:.2f}"))
 
-        # -----------------------
+        st.subheader("💰 Valores diarios del portafolio")
+        st.dataframe(df_valores_diarios.style.format("{:,.0f}"))
+
         # Paso 7: Descargar resultados
-        # -----------------------
         st.download_button(
             "💾 Descargar resultados CSV",
             resultados.to_csv(index=False),
             file_name=f"resultados_{nombre_grupo}.csv"
         )
-        st.info("Por favor descarga los resultados para subirlos en la siguiente pestaña.")
+
+        st.info("Por favor descarga los resultados para que los subas en la siguiente pestaña.")
