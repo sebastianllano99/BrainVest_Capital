@@ -74,9 +74,25 @@ if st.button("🔄 Actualizar"):
         ])
         st.dataframe(df_total)
 
-        # Podio por Sharpe (puedes cambiar el criterio)
+        # Podio oficial por Sharpe
         st.subheader("🏆 Top 3 por Sharpe Ratio")
         top3 = df_total.sort_values("Sharpe", ascending=False).head(3)
         st.table(top3)
+
+        # 🔹 Menciones especiales
+        st.subheader("🌟 Menciones Especiales")
+
+        # Más rentable (mayor ganancia total)
+        mas_rentable = df_total.loc[df_total["Ganancia Total"].idxmax()]
+        st.write(f"💰 **Más rentable:** {mas_rentable['Grupo']} con {mas_rentable['Ganancia Total']:.2f}")
+
+        # Más seguro (menor riesgo)
+        mas_seguro = df_total.loc[df_total["Riesgo"].idxmin()]
+        st.write(f"🛡️ **Más seguro:** {mas_seguro['Grupo']} con riesgo {mas_seguro['Riesgo']:.2f}")
+
+        # Más consistente (más días arriba)
+        mas_consistente = df_total.loc[df_total["Días Arriba"].idxmax()]
+        st.write(f"📈 **Más consistente:** {mas_consistente['Grupo']} con {mas_consistente['Días Arriba']} días arriba")
+
     else:
         st.info("Aún no hay resultados guardados.")
