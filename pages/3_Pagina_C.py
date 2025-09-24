@@ -5,7 +5,6 @@ import numpy as np
 import os
 import zipfile
 import gdown
-import math  # para floor si se desea
 
 # -----------------------
 # Configuración
@@ -89,27 +88,14 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
         df_user = df_user[df_user['Ticker'].isin(tickers_validos)].reset_index(drop=True)
 
         # -----------------------
-        # Distribución monetaria y cantidad de acciones (ajuste incluido)
+        # Distribución monetaria y cantidad de acciones (fraccionarias)
         # -----------------------
         df_user['MontoInvertido'] = (df_user["% del Portafolio"] / 100) * CAPITAL_INICIAL
         df_user['CantidadAcciones'] = df_user.apply(
-            lambda row: math.floor(row['MontoInvertido'] / primer_dia_precios[row['Ticker']]),
+            lambda row: row['MontoInvertido'] / primer_dia_precios[row['Ticker']],
             axis=1
         )
-        df_user['MontoAsignado'] = df_user.apply(
-            lambda row: row['CantidadAcciones'] * primer_dia_precios[row['Ticker']],
-            axis=1
-        )
-
-        # Ajustar el último ticker para cuadrar exactamente con CAPITAL_INICIAL
-        diferencia = CAPITAL_INICIAL - df_user['MontoAsignado'].sum()
-        ultimo_ticker = df_user.index[-1]
-        ticker_ultimo = df_user.at[ultimo_ticker, 'Ticker']
-        ajuste_acciones = round(diferencia / primer_dia_precios[ticker_ultimo])
-        df_user.at[ultimo_ticker, 'CantidadAcciones'] += ajuste_acciones
-        df_user.at[ultimo_ticker, 'MontoAsignado'] = (
-            df_user.at[ultimo_ticker, 'CantidadAcciones'] * primer_dia_precios[ticker_ultimo]
-        )
+        df_user['MontoAsignado'] = df_user['MontoInvertido']  # ahora coincide exactamente
 
         st.subheader("💵 Distribución Monetaria Inicial por Acción")
         st.dataframe(df_user)
