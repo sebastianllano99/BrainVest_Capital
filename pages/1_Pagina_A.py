@@ -50,12 +50,12 @@ for f in archivos:
 # ================================
 # BOTÓN DESCARGA MASIVA
 # ================================
-st.sidebar.subheader("📦 Descargar datos")
+st.sidebar.subheader(" Descargar datos")
 
 # usamos directamente el archivo original descargado de Drive
 with open(ZIP_NAME, "rb") as f:
     st.sidebar.download_button(
-        label="⬇️ Descargar todos los históricos (ZIP)",
+        label="Descargar todos los históricos (ZIP)",
         data=f,
         file_name="historicos_acciones.zip",
         mime="application/zip"
@@ -64,14 +64,14 @@ with open(ZIP_NAME, "rb") as f:
 # ================================
 # NAVEGACIÓN
 # ================================
-st.sidebar.title("📊 Navegación")
+st.sidebar.title(" Navegación")
 pagina = st.sidebar.radio("Selecciona una página:", ["Análisis Histórico"])
 
 # ================================
 # PÁGINA DE ANÁLISIS HISTÓRICO
 # ================================
 if pagina == "Análisis Histórico":
-    st.title("📈 Visualización de Históricos de Empresas")
+    st.title(" Visualización de Históricos de Empresas")
 
     ticker = st.selectbox("Seleccione una empresa:", sorted(tickers.keys()))
     st.session_state["ticker"] = ticker
@@ -91,7 +91,7 @@ if pagina == "Análisis Histórico":
     # ================================
     # TABLA
     # ================================
-    st.subheader(f"📋 Datos históricos - {ticker}")
+    st.subheader(f" Datos históricos - {ticker}")
     st.dataframe(df, use_container_width=True, height=400)
 
     # ================================
@@ -124,7 +124,7 @@ if pagina == "Análisis Histórico":
     # ================================
     # GRÁFICO DE PRECIOS
     # ================================
-    st.subheader("💹 Evolución del Precio Ajustado (Adj Close)")
+    st.subheader(" Evolución del Precio Ajustado (Adj Close)")
     fig_price = px.line(df, x="Date", y="Adj Close",
                         title=f"Evolución histórica de {ticker}",
                         labels={"Date": "Fecha", "Adj Close": "Precio Ajustado"},
@@ -136,7 +136,7 @@ if pagina == "Análisis Histórico":
     # ================================
     # GRÁFICO DE VOLUMEN
     # ================================
-    st.subheader("📊 Volumen de Transacciones")
+    st.subheader(" Volumen de Transacciones")
     opcion_vol = st.selectbox("Frecuencia del volumen", ["Diario", "Semanal", "Mensual"])
     df_vol = df.copy()
     if opcion_vol == "Semanal":
@@ -154,7 +154,7 @@ if pagina == "Análisis Histórico":
     # ================================
     # GRÁFICO DE RETORNOS
     # ================================
-    st.subheader("📉 Retornos de la Acción")
+    st.subheader(" Retornos de la Acción")
     opcion_ret = st.selectbox("Frecuencia de retornos", ["Diario", "Semanal", "Mensual"])
     df_ret = df.copy()
     if opcion_ret == "Semanal":
@@ -173,3 +173,4 @@ if pagina == "Análisis Histórico":
                                  line=dict(color=azul, width=3)))
     fig_ret.update_xaxes(**rango_xaxis())
     st.plotly_chart(fig_ret, use_container_width=True)
+
