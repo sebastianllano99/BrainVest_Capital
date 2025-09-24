@@ -5,8 +5,6 @@ import numpy as np
 import os
 import zipfile
 import gdown
-#import gspread
-#from google.oauth2.service_account import Credentials
 
 # -----------------------
 # Configuración
@@ -117,16 +115,16 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
 
         ganancia_total = df_portafolio.iloc[-1] - CAPITAL_INICIAL
 
-        # DataFrame de resultados
+        # DataFrame de resultados (sin tildes)
         resultados = pd.DataFrame({
             "Grupo": [nombre_grupo],
             "Rentabilidad Anualizada": [rent_anual],
             "Riesgo": [riesgo_anual],
             "Sharpe": [sharpe],
-            "Días Arriba": [dias_arriba],
-            "Días Abajo": [dias_abajo],
+            "Dias Arriba": [dias_arriba],
+            "Dias Abajo": [dias_abajo],
             "Ganancia Promedio Arriba": [ganancia_promedio_arriba],
-            "Pérdida Promedio Abajo": [perdida_promedio_abajo],
+            "Perdida Promedio Abajo": [perdida_promedio_abajo],
             "Ganancia Total": [ganancia_total]
         })
 
@@ -141,25 +139,3 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
         )
 
         st.info("📌 Por favor descarga los resultados para subirlos en la siguiente pestaña.")
-
-        # -----------------------
-        # Conexión con Google Sheets (opcional, comentada)
-        # -----------------------
-        """
-        try:
-            sheet = conectar_google_sheets()
-            sheet.append_row([
-                nombre_grupo,
-                float(rent_anual),
-                float(riesgo_anual),
-                float(sharpe),
-                int(dias_arriba),
-                int(dias_abajo),
-                float(ganancia_promedio_arriba),
-                float(perdida_promedio_abajo),
-                float(ganancia_total)
-            ])
-            st.success("✅ Resultados enviados al Sheet maestro en Drive")
-        except Exception as e:
-            st.error(f"❌ Error guardando en Google Sheets: {e}")
-        """
