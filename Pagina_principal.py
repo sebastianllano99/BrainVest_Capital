@@ -84,11 +84,13 @@ else:
 
     # PÁGINAS
     else:
-        mapping = {
+                mapping = {
             "pagina_a": "1_Pagina_A.py",
             "pagina_b": "2_Pagina_B.py",
-            "pagina_c": "3_Pagina_C.py"
+            "pagina_c": "3_Pagina_C.py",
+            "pagina_d": "4_Pagina_D.py"  
         }
+
 
         page_file = mapping.get(st.session_state["current_page"])
         if page_file:
@@ -100,3 +102,4 @@ else:
                 pagina = importlib.util.module_from_spec(spec)
                 sys.modules["pagina"] = pagina
                 spec.loader.exec_module(pagina)
+
