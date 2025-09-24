@@ -4,8 +4,6 @@ import numpy as np
 import os
 import zipfile
 import gdown
-import gspread
-from google.oauth2.service_account import Credentials
 
 # -----------------------
 # Configuración
@@ -14,22 +12,6 @@ CAPITAL_INICIAL = 200_000_000
 ZIP_URL = "https://drive.google.com/uc?id=1sgshq-1MLrO1oToV8uu-iM4SPnvgT149"
 ZIP_NAME = "acciones_2024.zip"
 CARPETA_DATOS = "Acciones_2024"
-
-# Este es el ID del Sheet que me enviaste
-SHEET_ID = "1VLfiwHg0kBhBA9CgkVC6Qbi6qYcjOc7KudIY03L7U9E"
-
-# -----------------------
-# Conectar con Google Sheets
-# -----------------------
-def conectar_google_sheets():
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-    client = gspread.authorize(creds)
-    return client.open_by_key(SHEET_ID).sheet1
 
 # -----------------------
 # Interfaz
@@ -41,6 +23,7 @@ Sube un CSV con columnas `Ticker` y `% del Portafolio`.
 Puedes descargar el ejemplo para guiarte en el formato correcto.
 """)
 
+# Ejemplo CSV
 ejemplo = pd.DataFrame({
     "Ticker": ["AAPL", "MSFT", "GOOGL"],
     "% del Portafolio": [40, 30, 30]
@@ -53,7 +36,6 @@ st.download_button(
 
 uploaded = st.file_uploader("📂 Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
-
 nombre_grupo = st.text_input("✍️ Ingresa el nombre de tu grupo")
 
 if uploaded:
@@ -65,13 +47,12 @@ if uploaded:
         st.error(f"❌ Error leyendo tu CSV: {e}")
 
 # -----------------------
-# Botón finalizar simulación y enviar fila al Sheet
+# Botón finalizar simulación
 # -----------------------
 if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_grupo.strip() != "":
-
     st.info("Simulación en ejecución...")
 
-    # Paso 1: descargar/extraer ZIP si no existe
+    # Descargar/extraer ZIP si no existe
     if not os.path.exists(ZIP_NAME):
         gdown.download(ZIP_URL, ZIP_NAME, quiet=False)
 
@@ -79,7 +60,7 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_gr
         with zipfile.ZipFile(ZIP_NAME, 'r') as zip_ref:
             zip_ref.extractall(".")
 
-    # Paso 2: leer precios reales de los tickers del usuario
+    # Leer precios de los tickers del usuario
     precios = {}
     primer_dia_precios = {}
     tickers_validos = []
@@ -101,22 +82,27 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_gr
         df_precios = pd.DataFrame(precios)
         df_user = df_user[df_user['Ticker'].isin(tickers_validos)].reset_index(drop=True)
 
+        # Monto invertido y cantidad de acciones
         df_user['Monto Invertido'] = (df_user["% del Portafolio"] / 100) * CAPITAL_INICIAL
         df_user['Cantidad Acciones'] = df_user.apply(
             lambda row: row['Monto Invertido'] / primer_dia_precios[row['Ticker']], axis=1
         )
 
+        # Valor diario del portafolio
         valores_diarios = df_precios * df_user['Cantidad Acciones'].values
         df_portafolio = valores_diarios.sum(axis=1)
 
+        # Retornos diarios y métricas
         retornos_diarios = df_portafolio.pct_change().fillna(0)
         rent_anual = (1 + retornos_diarios.mean())**252 - 1
         riesgo_anual = retornos_diarios.std() * np.sqrt(252)
         sharpe = rent_anual / riesgo_anual if riesgo_anual > 0 else 0
 
+        # Días por encima y por debajo del capital inicial
         dias_arriba = (df_portafolio > CAPITAL_INICIAL).sum()
         dias_abajo = (df_portafolio <= CAPITAL_INICIAL).sum()
 
+        # Resultados para mostrar y descargar
         resultados = pd.DataFrame({
             "Grupo": [nombre_grupo],
             "Rentabilidad Anualizada": [rent_anual],
@@ -129,17 +115,12 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_gr
         st.subheader("📈 Resultados del Portafolio")
         st.dataframe(resultados)
 
-        # Enviar fila al Google Sheet
-        try:
-            sheet = conectar_google_sheets()
-            sheet.append_row([
-                nombre_grupo,
-                float(rent_anual),
-                float(riesgo_anual),
-                float(sharpe),
-                int(dias_arriba),
-                int(dias_abajo)
-            ])
-            st.success("✅ Resultados enviados al Sheet maestro en Drive")
-        except Exception as e:
-            st.error(f"❌ Error guardando en Google Sheets: {e}")
+        # Botón para descargar resultados CSV
+        st.download_button(
+            "💾 Descargar resultados CSV",
+            resultados.to_csv(index=False),
+            file_name=f"{nombre_grupo}_resultados.csv"
+        )
+
+        st.info("📌 Por favor descarga los resultados para que los subas en la siguiente pestaña de comprobación de resultados.")
+
