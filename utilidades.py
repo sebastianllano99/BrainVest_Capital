@@ -1,6 +1,6 @@
-# ================================
+
 # utilidades.py
-# ================================
+
 import streamlit as st
 
 def aplicar_estilos(hide_streamlit_nav=True):
@@ -75,5 +75,6 @@ def generarMenu_horizontal():
     with cols[4]:
         if st.button("Comparativa"):
             st.session_state["current_page"] = "pagina_d"
+
 
 
