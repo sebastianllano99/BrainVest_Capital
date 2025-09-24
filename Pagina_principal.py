@@ -1,8 +1,15 @@
 import streamlit as st
 import os
 import sqlite3
-import utilidades as util
 import importlib.util, sys
+
+# =========================
+# Ajustar ruta base
+# =========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+
+import utilidades as util
 
 st.set_page_config(page_title="Simulación Bursátil", layout="wide")
 
@@ -73,7 +80,6 @@ else:
     # Menú horizontal
     util.generarMenu_horizontal()
 
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PAGES_DIR = os.path.join(BASE_DIR, "pages")
 
     # HOME
