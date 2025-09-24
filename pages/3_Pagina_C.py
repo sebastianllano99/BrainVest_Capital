@@ -34,7 +34,7 @@ st.download_button(
     file_name="ejemplo_portafolio.csv"
 )
 
-uploaded = st.file_uploader("📂 Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
+uploaded = st.file_uploader(" Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
 
 # Nombre del grupo desde login
@@ -43,16 +43,16 @@ nombre_grupo = st.session_state.get("username", "Grupo_Desconocido")
 # -----------------------
 # Botón finalizar simulación
 # -----------------------
-if st.button("🚀 Finalizar Simulación") and uploaded is not None:
+if st.button("Finalizar Simulación") and uploaded is not None:
 
     st.info("Simulación en ejecución...")
 
     try:
         df_user = pd.read_csv(uploaded)
-        st.success("✅ CSV cargado correctamente")
+        st.success(" CSV cargado correctamente")
         st.dataframe(df_user)
     except Exception as e:
-        st.error(f"❌ Error leyendo tu CSV: {e}")
+        st.error(f" Error leyendo tu CSV: {e}")
         st.stop()
 
     # Descargar/extraer ZIP si no existe
@@ -77,10 +77,10 @@ if st.button("🚀 Finalizar Simulación") and uploaded is not None:
             precios[ticker] = df_ticker['Adj Close']  # usamos siempre Adjusted Close
             tickers_validos.append(ticker)
         else:
-            st.warning(f"⚠️ No se encontró archivo para {ticker}, se ignorará.")
+            st.warning(f" No se encontró archivo para {ticker}, se ignorará.")
 
     if not precios:
-        st.error("❌ No hay tickers válidos para simular.")
+        st.error(" No hay tickers válidos para simular.")
         st.stop()
 
     df_precios = pd.DataFrame(precios).sort_index()
@@ -99,7 +99,7 @@ if st.button("🚀 Finalizar Simulación") and uploaded is not None:
         axis=1
     )
 
-    st.subheader("💵 Distribución Monetaria Inicial por Acción")
+    st.subheader(" Distribución Monetaria Inicial por Acción")
     st.dataframe(df_user)
 
     # -----------------------
@@ -110,13 +110,13 @@ if st.button("🚀 Finalizar Simulación") and uploaded is not None:
 
     # Validación inicial
     valor_inicial = valores_diarios.iloc[0]['PortafolioTotal']
-    st.write(f"💡 Capital inicial configurado: {CAPITAL_INICIAL:,.0f}")
-    st.write(f"💡 Valor del portafolio en el día 1: {valor_inicial:,.0f}")
+    st.write(f" Capital inicial configurado: {CAPITAL_INICIAL:,.0f}")
+    st.write(f" Valor del portafolio en el día 1: {valor_inicial:,.0f}")
 
     df_valores_diarios_form = valores_diarios.copy()
     df_valores_diarios_form = df_valores_diarios_form.applymap(lambda x: f"{x:,.0f}")
 
-    st.subheader("📊 Valores Diarios por Acción")
+    st.subheader(" Valores Diarios por Acción")
     st.dataframe(df_valores_diarios_form)
 
     # -----------------------
@@ -145,7 +145,7 @@ if st.button("🚀 Finalizar Simulación") and uploaded is not None:
         "GananciaTotal": [ganancia_total]
     })
 
-    st.subheader("📈 Resultados del Portafolio")
+    st.subheader(" Resultados del Portafolio")
     resultados_formateado = resultados.copy()
     for col in resultados_formateado.columns[1:]:
         resultados_formateado[col] = resultados_formateado[col].map(lambda x: f"{x:,.2f}")
@@ -155,9 +155,10 @@ if st.button("🚀 Finalizar Simulación") and uploaded is not None:
     # Descargar CSV resultados
     # -----------------------
     st.download_button(
-        "💾 Descargar resultados CSV",
+        " Descargar resultados CSV",
         resultados.to_csv(index=False),
         file_name=f"resultados_{nombre_grupo}.csv"
     )
 
     st.info("Por favor descarga los resultados para subirlos en la siguiente pestaña.")
+
