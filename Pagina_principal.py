@@ -1,21 +1,21 @@
+# ================================
+# Pagina_principal.py
+# ================================
 import streamlit as st
 import os
 import sqlite3
+import utilidades as util
 import importlib.util
 import sys
 
+# ------------------------
+# CONFIGURACIÓN INICIAL
+# ------------------------
 st.set_page_config(page_title="Simulación Bursátil", layout="wide")
 
-# ==== CARGAR UTILIDADES DINÁMICAMENTE ====
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-utilidades_path = os.path.join(BASE_DIR, "utilidades.py")
-
-spec = importlib.util.spec_from_file_location("util", utilidades_path)
-util = importlib.util.module_from_spec(spec)
-sys.modules["util"] = util
-spec.loader.exec_module(util)
-
-# ==== BASE DE DATOS ====
+# ------------------------
+# BASE DE DATOS
+# ------------------------
 conn = sqlite3.connect("jugadores.db")
 c = conn.cursor()
 c.execute('''
@@ -27,14 +27,18 @@ c.execute('''
 ''')
 conn.commit()
 
-# ==== PERFILES ====
+# ------------------------
+# PERFILES (contraseñas)
+# ------------------------
 passwords = {
     "4539": "Conservador", "6758": "Conservador",
     "8795": "Moderado", "7906": "Moderado",
     "1357": "Arriesgado", "8745": "Arriesgado"
 }
 
-# ==== LOGIN ====
+# ------------------------
+# LOGIN
+# ------------------------
 def login_screen():
     st.title("Ingreso a la Simulación")
     username = st.text_input("Nombre del grupo")
@@ -48,33 +52,46 @@ def login_screen():
             if data is None:
                 c.execute("INSERT INTO jugadores (nombre, perfil) VALUES (?, ?)", (username, perfil))
                 conn.commit()
+
+            # Guardar en la sesión
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["perfil"] = perfil
+
             st.success(f"Bienvenido {username} | Perfil asignado: {perfil}")
             st.rerun()
         else:
             st.error("Contraseña incorrecta")
 
-# ==== ESTADO DE SESIÓN ====
+# ------------------------
+# SESIÓN INICIAL
+# ------------------------
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "home"
 
-# ==== APLICAR ESTILOS ====
+# ------------------------
+# APLICAR ESTILOS
+# ------------------------
 util.aplicar_estilos(hide_streamlit_nav=True)
 
-# ==== FLUJO PRINCIPAL ====
+# ------------------------
+# FLUJO PRINCIPAL
+# ------------------------
 if not st.session_state["logged_in"]:
     login_screen()
+
 else:
     # Menú horizontal
     util.generarMenu_horizontal()
 
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PAGES_DIR = os.path.join(BASE_DIR, "pages")
 
+    # ------------------------
     # HOME
+    # ------------------------
     if st.session_state["current_page"] == "home":
         st.title("BrainVest Capital")
         st.subheader("Crea tu propio portafolio de manera inteligente")
@@ -90,7 +107,9 @@ else:
             unsafe_allow_html=True
         )
 
-    # PÁGINAS
+    # ------------------------
+    # OTRAS PÁGINAS
+    # ------------------------
     else:
         mapping = {
             "pagina_a": "1_Pagina_A.py",
@@ -105,6 +124,7 @@ else:
             if not os.path.exists(page_path):
                 st.error(f"No se encontró el archivo en: {page_path}")
             else:
+                # Cargar la página de forma dinámica
                 spec = importlib.util.spec_from_file_location("pagina", page_path)
                 pagina = importlib.util.module_from_spec(spec)
                 sys.modules["pagina"] = pagina
