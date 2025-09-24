@@ -38,8 +38,12 @@ st.download_button(
 uploaded = st.file_uploader("📂 Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
 
-# Nombre del grupo (del login o manual)
-nombre_grupo = st.text_input("✍️ Ingresa el nombre de tu grupo")
+# Usar el nombre de grupo desde el login
+if "username" in st.session_state:
+    nombre_grupo = st.session_state["username"]
+else:
+    st.error("❌ No se detectó sesión activa. Por favor inicia sesión.")
+    st.stop()
 
 if uploaded:
     try:
@@ -52,7 +56,7 @@ if uploaded:
 # -----------------------
 # Botón finalizar simulación
 # -----------------------
-if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_grupo.strip() != "":
+if st.button("🚀 Finalizar Simulación") and df_user is not None:
 
     st.info("Simulación en ejecución...")
 
