@@ -1,9 +1,12 @@
+# 3_Pagina_C.py
 import streamlit as st
 import pandas as pd
 import numpy as np
 import os
 import zipfile
 import gdown
+#import gspread
+#from google.oauth2.service_account import Credentials
 
 # -----------------------
 # Configuración
@@ -30,20 +33,16 @@ ejemplo = pd.DataFrame({
 })
 st.download_button(
     "📥 Descargar ejemplo CSV",
-    ejemplo.to_csv(index=False),
+    ejemplo.to_csv(index=False, encoding='utf-8-sig'),
     file_name="ejemplo_portafolio.csv"
 )
 
-# Subida CSV usuario
+# CSV del usuario
 uploaded = st.file_uploader("📂 Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
 
-# Usar el nombre de grupo desde el login
-if "username" in st.session_state:
-    nombre_grupo = st.session_state["username"]
-else:
-    st.error("❌ No se detectó sesión activa. Por favor inicia sesión.")
-    st.stop()
+# Información del grupo desde login
+nombre_grupo = st.session_state.get("username", "Grupo_SinNombre")
 
 if uploaded:
     try:
@@ -60,7 +59,7 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
 
     st.info("Simulación en ejecución...")
 
-    # Paso 1: descargar/extraer ZIP si no existe
+    # Descargar y extraer ZIP si no existe
     if not os.path.exists(ZIP_NAME):
         gdown.download(ZIP_URL, ZIP_NAME, quiet=False)
 
@@ -68,7 +67,7 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
         with zipfile.ZipFile(ZIP_NAME, 'r') as zip_ref:
             zip_ref.extractall(".")
 
-    # Paso 2: leer precios reales de los tickers del usuario
+    # Leer precios de los tickers del usuario
     precios = {}
     primer_dia_precios = {}
     tickers_validos = []
@@ -90,56 +89,51 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
         df_precios = pd.DataFrame(precios)
         df_user = df_user[df_user['Ticker'].isin(tickers_validos)].reset_index(drop=True)
 
-        # -----------------------
-        # Paso 3: Calcular monto invertido y cantidad de acciones
-        # -----------------------
+        # Distribución monetaria y cantidad de acciones
         df_user['Monto Invertido'] = (df_user["% del Portafolio"] / 100) * CAPITAL_INICIAL
         df_user['Cantidad Acciones'] = df_user.apply(
             lambda row: row['Monto Invertido'] / primer_dia_precios[row['Ticker']], axis=1
         )
 
-        # -----------------------
-        # Paso 4: Calcular valor diario del portafolio
-        # -----------------------
+        # Valor diario del portafolio
         valores_diarios = df_precios * df_user['Cantidad Acciones'].values
         df_portafolio = valores_diarios.sum(axis=1)
 
-        # -----------------------
-        # Paso 5: Calcular métricas
-        # -----------------------
+        # Retornos diarios y métricas
         retornos_diarios = df_portafolio.pct_change().fillna(0)
-        rentabilidad_anualizada = (1 + retornos_diarios.mean())**252 - 1
-        riesgo_anualizado = retornos_diarios.std() * np.sqrt(252)
-        sharpe_ratio = rentabilidad_anualizada / riesgo_anualizado if riesgo_anualizado > 0 else 0
+        rent_anual = (1 + retornos_diarios.mean())**252 - 1
+        riesgo_anual = retornos_diarios.std() * np.sqrt(252)
+        sharpe = rent_anual / riesgo_anual if riesgo_anual > 0 else 0
 
-        dias_arriba = (df_portafolio > CAPITAL_INICIAL)
-        dias_abajo = (df_portafolio <= CAPITAL_INICIAL)
+        # Días arriba/abajo y ganancias/pérdidas
+        dias_arriba_mask = df_portafolio > CAPITAL_INICIAL
+        dias_abajo_mask = df_portafolio <= CAPITAL_INICIAL
 
-        ganancia_promedio_arriba = (df_portafolio[dias_arriba] - CAPITAL_INICIAL).mean() if dias_arriba.sum() > 0 else 0
-        perdida_promedio_abajo = (df_portafolio[dias_abajo] - CAPITAL_INICIAL).mean() if dias_abajo.sum() > 0 else 0
+        dias_arriba = dias_arriba_mask.sum()
+        dias_abajo = dias_abajo_mask.sum()
+
+        ganancia_promedio_arriba = (df_portafolio[dias_arriba_mask] - CAPITAL_INICIAL).mean() if dias_arriba>0 else 0
+        perdida_promedio_abajo = (df_portafolio[dias_abajo_mask] - CAPITAL_INICIAL).mean() if dias_abajo>0 else 0
+
         ganancia_total = df_portafolio.iloc[-1] - CAPITAL_INICIAL
 
+        # DataFrame de resultados
         resultados = pd.DataFrame({
             "Grupo": [nombre_grupo],
-            "Rentabilidad Anualizada": [rentabilidad_anualizada],
-            "Riesgo": [riesgo_anualizado],
-            "Sharpe": [sharpe_ratio],
-            "Días Arriba": [dias_arriba.sum()],
-            "Días Abajo": [dias_abajo.sum()],
+            "Rentabilidad Anualizada": [rent_anual],
+            "Riesgo": [riesgo_anual],
+            "Sharpe": [sharpe],
+            "Días Arriba": [dias_arriba],
+            "Días Abajo": [dias_abajo],
             "Ganancia Promedio Arriba": [ganancia_promedio_arriba],
             "Pérdida Promedio Abajo": [perdida_promedio_abajo],
             "Ganancia Total": [ganancia_total]
         })
 
-        # -----------------------
-        # Paso 6: Mostrar resultados
-        # -----------------------
         st.subheader("📈 Resultados del Portafolio")
         st.dataframe(resultados)
 
-        # -----------------------
-        # Paso 7: Descargar resultados
-        # -----------------------
+        # Descargar resultados CSV
         st.download_button(
             "💾 Descargar resultados CSV",
             resultados.to_csv(index=False, encoding='utf-8-sig'),
@@ -147,3 +141,25 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
         )
 
         st.info("📌 Por favor descarga los resultados para subirlos en la siguiente pestaña.")
+
+        # -----------------------
+        # Conexión con Google Sheets (opcional, comentada)
+        # -----------------------
+        """
+        try:
+            sheet = conectar_google_sheets()
+            sheet.append_row([
+                nombre_grupo,
+                float(rent_anual),
+                float(riesgo_anual),
+                float(sharpe),
+                int(dias_arriba),
+                int(dias_abajo),
+                float(ganancia_promedio_arriba),
+                float(perdida_promedio_abajo),
+                float(ganancia_total)
+            ])
+            st.success("✅ Resultados enviados al Sheet maestro en Drive")
+        except Exception as e:
+            st.error(f"❌ Error guardando en Google Sheets: {e}")
+        """
