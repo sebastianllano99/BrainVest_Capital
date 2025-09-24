@@ -1,29 +1,26 @@
-# ================================
+
 # Pagina_principal.py
-# ================================
+
 import streamlit as st
 import os
 import sqlite3
 import importlib.util
 import sys
 
-# ------------------------
 # AJUSTAR RUTA PARA UTILIDADES
-# ------------------------
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
 import utilidades as util
 
-# ------------------------
 # CONFIGURACIÓN INICIAL
-# ------------------------
+
 st.set_page_config(page_title="Simulación Bursátil", layout="wide")
 
-# ------------------------
 # BASE DE DATOS
-# ------------------------
+
 conn = sqlite3.connect("jugadores.db")
 c = conn.cursor()
 c.execute('''
@@ -35,18 +32,13 @@ c.execute('''
 ''')
 conn.commit()
 
-# ------------------------
 # PERFILES (contraseñas)
-# ------------------------
 passwords = {
-    "4539": "Conservador", "6758": "Conservador",
-    "8795": "Moderado", "7906": "Moderado",
-    "1357": "Arriesgado", "8745": "Arriesgado"
+    "4539": "Usuario"
 }
 
-# ------------------------
 # LOGIN
-# ------------------------
+
 def login_screen():
     st.title("Ingreso a la Simulación")
     username = st.text_input("Nombre del grupo")
@@ -71,22 +63,19 @@ def login_screen():
         else:
             st.error("Contraseña incorrecta")
 
-# ------------------------
 # SESIÓN INICIAL
-# ------------------------
+
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "home"
 
-# ------------------------
 # APLICAR ESTILOS
-# ------------------------
+
 util.aplicar_estilos(hide_streamlit_nav=True)
 
-# ------------------------
 # FLUJO PRINCIPAL
-# ------------------------
+
 if not st.session_state["logged_in"]:
     login_screen()
 
@@ -97,9 +86,8 @@ else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PAGES_DIR = os.path.join(BASE_DIR, "pages")
 
-    # ------------------------
     # HOME
-    # ------------------------
+   
     if st.session_state["current_page"] == "home":
         st.title("BrainVest Capital")
         st.subheader("Crea tu propio portafolio de manera inteligente")
@@ -137,3 +125,4 @@ else:
                 pagina = importlib.util.module_from_spec(spec)
                 sys.modules["pagina"] = pagina
                 spec.loader.exec_module(pagina)
+
