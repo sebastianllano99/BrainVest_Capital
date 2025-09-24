@@ -1,4 +1,3 @@
-# 3_Pagina_C.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -20,10 +19,11 @@ CARPETA_DATOS = "Acciones_2024"
 st.title("Simulación de Portafolio")
 
 st.write("""
-Sube un CSV con columnas `Ticker` y `% del Portafolio`.
+Sube un CSV con columnas `Ticker` y `% del Portafolio`.  
 Puedes descargar el ejemplo para guiarte en el formato correcto.
 """)
 
+# Ejemplo CSV
 ejemplo = pd.DataFrame({
     "Ticker": ["AAPL", "MSFT", "GOOGL"],
     "% del Portafolio": [40, 30, 30]
@@ -34,15 +34,13 @@ st.download_button(
     file_name="ejemplo_portafolio.csv"
 )
 
+# Subida CSV usuario
 uploaded = st.file_uploader("📂 Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
 
-# Tomar el nombre del grupo directamente del login
-nombre_grupo = st.session_state.get("username", "")
+# Nombre del grupo (del login o manual)
+nombre_grupo = st.text_input("✍️ Ingresa el nombre de tu grupo")
 
-# -----------------------
-# Leer CSV subido
-# -----------------------
 if uploaded:
     try:
         df_user = pd.read_csv(uploaded)
@@ -52,13 +50,13 @@ if uploaded:
         st.error(f"❌ Error leyendo tu CSV: {e}")
 
 # -----------------------
-# Botón Finalizar Simulación
+# Botón finalizar simulación
 # -----------------------
-if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_grupo != "":
+if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_grupo.strip() != "":
 
     st.info("Simulación en ejecución...")
 
-    # Paso 1: Descargar/Extraer ZIP
+    # Paso 1: descargar/extraer ZIP si no existe
     if not os.path.exists(ZIP_NAME):
         gdown.download(ZIP_URL, ZIP_NAME, quiet=False)
 
@@ -66,7 +64,7 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_gr
         with zipfile.ZipFile(ZIP_NAME, 'r') as zip_ref:
             zip_ref.extractall(".")
 
-    # Paso 2: Leer precios de los tickers del usuario
+    # Paso 2: leer precios reales de los tickers del usuario
     precios = {}
     primer_dia_precios = {}
     tickers_validos = []
@@ -85,66 +83,63 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_gr
     if not precios:
         st.error("❌ No hay tickers válidos para simular.")
     else:
-        # Alinear tickers válidos
         df_precios = pd.DataFrame(precios)
         df_user = df_user[df_user['Ticker'].isin(tickers_validos)].reset_index(drop=True)
 
-        # Paso 3: Distribución monetaria y cantidad de acciones
+        # -----------------------
+        # Paso 3: Calcular monto invertido y cantidad de acciones
+        # -----------------------
         df_user['Monto Invertido'] = (df_user["% del Portafolio"] / 100) * CAPITAL_INICIAL
         df_user['Cantidad Acciones'] = df_user.apply(
             lambda row: row['Monto Invertido'] / primer_dia_precios[row['Ticker']], axis=1
         )
 
-        # Mostrar tabla de distribución monetaria
-        st.subheader("💰 Distribución de inversión por acción")
-        st.dataframe(df_user[['Ticker', '% del Portafolio', 'Monto Invertido', 'Cantidad Acciones']])
-
-        # Paso 4: Valor diario del portafolio
+        # -----------------------
+        # Paso 4: Calcular valor diario del portafolio
+        # -----------------------
         valores_diarios = df_precios * df_user['Cantidad Acciones'].values
         df_portafolio = valores_diarios.sum(axis=1)
 
-        # Paso 5: Métricas de rentabilidad y riesgo
+        # -----------------------
+        # Paso 5: Calcular métricas
+        # -----------------------
         retornos_diarios = df_portafolio.pct_change().fillna(0)
-        rent_anual = (1 + retornos_diarios.mean())**252 - 1
-        riesgo_anual = retornos_diarios.std() * np.sqrt(252)
-        sharpe = rent_anual / riesgo_anual if riesgo_anual > 0 else 0
+        rentabilidad_anualizada = (1 + retornos_diarios.mean())**252 - 1
+        riesgo_anualizado = retornos_diarios.std() * np.sqrt(252)
+        sharpe_ratio = rentabilidad_anualizada / riesgo_anualizado if riesgo_anualizado > 0 else 0
 
         dias_arriba = (df_portafolio > CAPITAL_INICIAL)
         dias_abajo = (df_portafolio <= CAPITAL_INICIAL)
-        num_arriba = dias_arriba.sum()
-        num_abajo = dias_abajo.sum()
 
-        # Ganancia/Pérdida por día
-        ganancia_diaria = df_portafolio - CAPITAL_INICIAL
-        ganancia_prom_arriba = ganancia_diaria[dias_arriba].mean() if num_arriba > 0 else 0
-        perdida_prom_abajo = ganancia_diaria[dias_abajo].mean() if num_abajo > 0 else 0
-        ganancia_total = ganancia_diaria.iloc[-1]
+        ganancia_promedio_arriba = (df_portafolio[dias_arriba] - CAPITAL_INICIAL).mean() if dias_arriba.sum() > 0 else 0
+        perdida_promedio_abajo = (df_portafolio[dias_abajo] - CAPITAL_INICIAL).mean() if dias_abajo.sum() > 0 else 0
+        ganancia_total = df_portafolio.iloc[-1] - CAPITAL_INICIAL
 
-        # Paso 6: Mostrar resultados
-        st.subheader("📈 Resultados del Portafolio")
-        st.write(f"Rentabilidad anualizada: {rent_anual:.2%}")
-        st.write(f"Riesgo (volatilidad anualizada): {riesgo_anual:.2%}")
-        st.write(f"Sharpe Ratio: {sharpe:.2f}")
-        st.write(f"Días por encima del capital inicial: {num_arriba} | Ganancia promedio: ${ganancia_prom_arriba:,.0f}")
-        st.write(f"Días por debajo del capital inicial: {num_abajo} | Pérdida promedio: ${perdida_prom_abajo:,.0f}")
-        st.write(f"Ganancia/Pérdida total al final del año: ${ganancia_total:,.0f}")
-
-        # Paso 7: Descargar resultados CSV
         resultados = pd.DataFrame({
             "Grupo": [nombre_grupo],
-            "Rentabilidad Anualizada": [rent_anual],
-            "Riesgo": [riesgo_anual],
-            "Sharpe": [sharpe],
-            "Días Arriba": [num_arriba],
-            "Días Abajo": [num_abajo],
-            "Ganancia Promedio Arriba": [ganancia_prom_arriba],
-            "Pérdida Promedio Abajo": [perdida_prom_abajo],
+            "Rentabilidad Anualizada": [rentabilidad_anualizada],
+            "Riesgo": [riesgo_anualizado],
+            "Sharpe": [sharpe_ratio],
+            "Días Arriba": [dias_arriba.sum()],
+            "Días Abajo": [dias_abajo.sum()],
+            "Ganancia Promedio Arriba": [ganancia_promedio_arriba],
+            "Pérdida Promedio Abajo": [perdida_promedio_abajo],
             "Ganancia Total": [ganancia_total]
         })
+
+        # -----------------------
+        # Paso 6: Mostrar resultados
+        # -----------------------
+        st.subheader("📈 Resultados del Portafolio")
+        st.dataframe(resultados)
+
+        # -----------------------
+        # Paso 7: Descargar resultados
+        # -----------------------
         st.download_button(
             "💾 Descargar resultados CSV",
-            resultados.to_csv(index=False),
+            resultados.to_csv(index=False, encoding='utf-8-sig'),
             file_name=f"resultados_{nombre_grupo}.csv"
         )
-        st.info("Por favor descarga los resultados para subirlos en la siguiente pestaña.")
 
+        st.info("📌 Por favor descarga los resultados para subirlos en la siguiente pestaña.")
