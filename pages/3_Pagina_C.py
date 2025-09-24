@@ -5,6 +5,7 @@ import numpy as np
 import os
 import zipfile
 import gdown
+import math  # para floor si se desea
 
 # -----------------------
 # Configuración
@@ -37,12 +38,9 @@ st.download_button(
 uploaded = st.file_uploader("📂 Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
 
-# Tomamos el nombre del grupo desde el login
+# Nombre del grupo desde login
 nombre_grupo = st.session_state.get("username", "Grupo_Desconocido")
 
-# -----------------------
-# Subida CSV
-# -----------------------
 if uploaded:
     try:
         df_user = pd.read_csv(uploaded)
@@ -67,7 +65,7 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
             zip_ref.extractall(".")
 
     # -----------------------
-    # Leer precios de los tickers del usuario
+    # Leer precios de los tickers
     # -----------------------
     precios = {}
     primer_dia_precios = {}
@@ -91,11 +89,11 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
         df_user = df_user[df_user['Ticker'].isin(tickers_validos)].reset_index(drop=True)
 
         # -----------------------
-        # Distribución monetaria y cantidad de acciones (enteras)
+        # Distribución monetaria y cantidad de acciones enteras
         # -----------------------
         df_user['MontoInvertido'] = (df_user["% del Portafolio"] / 100) * CAPITAL_INICIAL
         df_user['CantidadAcciones'] = df_user.apply(
-            lambda row: int(row['MontoInvertido'] // primer_dia_precios[row['Ticker']]),
+            lambda row: math.floor(row['MontoInvertido'] / primer_dia_precios[row['Ticker']]),
             axis=1
         )
         df_user['MontoAsignado'] = df_user.apply(
@@ -103,12 +101,20 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
             axis=1
         )
 
+        st.subheader("💵 Distribución Monetaria Inicial por Acción")
+        st.dataframe(df_user)
+
         # -----------------------
-        # Valor diario del portafolio
+        # Valor diario por acción y total del portafolio
         # -----------------------
         valores_diarios = df_precios * df_user['CantidadAcciones'].values
         df_valores_diarios = valores_diarios.copy()
         df_valores_diarios['PortafolioTotal'] = df_valores_diarios.sum(axis=1)
+
+        st.subheader("📊 Valores Diarios por Acción")
+        df_valores_diarios_form = df_valores_diarios.copy()
+        df_valores_diarios_form = df_valores_diarios_form.applymap(lambda x: f"{x:,.0f}")
+        st.dataframe(df_valores_diarios_form)
 
         # -----------------------
         # Retornos y métricas
@@ -120,7 +126,6 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
 
         dias_arriba = (df_valores_diarios['PortafolioTotal'] > CAPITAL_INICIAL).sum()
         dias_abajo = (df_valores_diarios['PortafolioTotal'] <= CAPITAL_INICIAL).sum()
-
         ganancia_prom_arriba = df_valores_diarios['PortafolioTotal'][df_valores_diarios['PortafolioTotal'] > CAPITAL_INICIAL].mean()
         perdida_prom_abajo = df_valores_diarios['PortafolioTotal'][df_valores_diarios['PortafolioTotal'] <= CAPITAL_INICIAL].mean()
         ganancia_total = df_valores_diarios['PortafolioTotal'].iloc[-1] - CAPITAL_INICIAL
@@ -137,19 +142,11 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None:
             "GananciaTotal": [ganancia_total]
         })
 
-        # -----------------------
-        # Mostrar resultados
-        # -----------------------
         st.subheader("📈 Resultados del Portafolio")
         resultados_formateado = resultados.copy()
         for col in resultados_formateado.columns[1:]:
             resultados_formateado[col] = resultados_formateado[col].map(lambda x: f"{x:,.2f}")
         st.dataframe(resultados_formateado)
-
-        st.subheader("💰 Valores diarios del portafolio")
-        df_valores_diarios_form = df_valores_diarios.copy()
-        df_valores_diarios_form = df_valores_diarios_form.applymap(lambda x: f"{x:,.0f}")
-        st.dataframe(df_valores_diarios_form)
 
         # -----------------------
         # Descargar CSV resultados
