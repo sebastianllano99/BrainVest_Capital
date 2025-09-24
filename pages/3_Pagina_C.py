@@ -4,8 +4,8 @@ import numpy as np
 import os
 import zipfile
 import gdown
-from pydrive2.auth import GoogleAuth
-from pydrive2.drive import GoogleDrive
+import gspread
+from google.oauth2.service_account import Credentials
 
 # -----------------------
 # Configuración
@@ -15,51 +15,21 @@ ZIP_URL = "https://drive.google.com/uc?id=1sgshq-1MLrO1oToV8uu-iM4SPnvgT149"
 ZIP_NAME = "acciones_2024.zip"
 CARPETA_DATOS = "Acciones_2024"
 
-# Aquí colocas el ID de la carpeta que me enviaste
-CARPETA_RESULTADOS_ID = "1okVq5b56rxJeOBHlxNr84ULX1xHf7tdD"  
-CCV_NAME = "CCV_resultados.csv"
+# Este es el ID del Sheet que me enviaste
+SHEET_ID = "1VLfiwHg0kBhBA9CgkVC6Qbi6qYcjOc7KudIY03L7U9E"
 
 # -----------------------
-# Funciones para Drive
+# Conectar con Google Sheets
 # -----------------------
-@st.cache_resource
-def autenticar_drive():
-    gauth = GoogleAuth()
-    gauth.LocalWebserverAuth()  # Esto abrirá una ventana para autenticar la primera vez
-    return GoogleDrive(gauth)
-
-def buscar_archivo(drive, nombre, carpeta_id):
-    """Devuelve el archivo existente en la carpeta de Drive si existe."""
-    query = f"'{carpeta_id}' in parents and trashed=false and title='{nombre}'"
-    archivos = drive.ListFile({'q': query}).GetList()
-    return archivos[0] if archivos else None
-
-def subir_resultados_a_drive(resultados, drive, carpeta_id, nombre_archivo):
-    """Sube los resultados al archivo maestro en Drive, creándolo si es necesario, o anexando la fila nueva."""
-    archivo = buscar_archivo(drive, nombre_archivo, carpeta_id)
-    if archivo:
-        # Descargar versión actual
-        archivo.GetContentFile("temp_ccv.csv")
-        ccv = pd.read_csv("temp_ccv.csv")
-        # Verificar que no haya ya una fila con el mismo grupo (opcional)
-        # Aquí se añade la nueva fila
-        ccv = pd.concat([ccv, resultados], ignore_index=True)
-    else:
-        ccv = resultados
-
-    # Guardar el CSV actualizado localmente
-    ccv.to_csv("temp_ccv.csv", index=False)
-
-    if archivo:
-        archivo.SetContentFile("temp_ccv.csv")
-        archivo.Upload()
-    else:
-        nuevo = drive.CreateFile({
-            "title": nombre_archivo,
-            "parents": [{"id": carpeta_id}]
-        })
-        nuevo.SetContentFile("temp_ccv.csv")
-        nuevo.Upload()
+def conectar_google_sheets():
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+    client = gspread.authorize(creds)
+    return client.open_by_key(SHEET_ID).sheet1
 
 # -----------------------
 # Interfaz
@@ -71,7 +41,6 @@ Sube un CSV con columnas `Ticker` y `% del Portafolio`.
 Puedes descargar el ejemplo para guiarte en el formato correcto.
 """)
 
-# Ejemplo CSV
 ejemplo = pd.DataFrame({
     "Ticker": ["AAPL", "MSFT", "GOOGL"],
     "% del Portafolio": [40, 30, 30]
@@ -82,7 +51,6 @@ st.download_button(
     file_name="ejemplo_portafolio.csv"
 )
 
-# Subida CSV usuario
 uploaded = st.file_uploader("📂 Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
 
@@ -97,13 +65,13 @@ if uploaded:
         st.error(f"❌ Error leyendo tu CSV: {e}")
 
 # -----------------------
-# Botón para finalizar simulación y enviar resultados
+# Botón finalizar simulación y enviar fila al Sheet
 # -----------------------
 if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_grupo.strip() != "":
 
     st.info("Simulación en ejecución...")
 
-    # Paso 1: Descargar ZIP de acciones si no existe
+    # Paso 1: descargar/extraer ZIP si no existe
     if not os.path.exists(ZIP_NAME):
         gdown.download(ZIP_URL, ZIP_NAME, quiet=False)
 
@@ -111,7 +79,7 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_gr
         with zipfile.ZipFile(ZIP_NAME, 'r') as zip_ref:
             zip_ref.extractall(".")
 
-    # Paso 2: Leer precios de los tickers del usuario
+    # Paso 2: leer precios reales de los tickers del usuario
     precios = {}
     primer_dia_precios = {}
     tickers_validos = []
@@ -161,8 +129,17 @@ if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_gr
         st.subheader("📈 Resultados del Portafolio")
         st.dataframe(resultados)
 
-        # Autenticación con Drive
-        drive = autenticar_drive()
-        subir_resultados_a_drive(resultados, drive, CARPETA_RESULTADOS_ID, CCV_NAME)
-
-        st.success("✅ Resultados enviados al archivo global en Drive")
+        # Enviar fila al Google Sheet
+        try:
+            sheet = conectar_google_sheets()
+            sheet.append_row([
+                nombre_grupo,
+                float(rent_anual),
+                float(riesgo_anual),
+                float(sharpe),
+                int(dias_arriba),
+                int(dias_abajo)
+            ])
+            st.success("✅ Resultados enviados al Sheet maestro en Drive")
+        except Exception as e:
+            st.error(f"❌ Error guardando en Google Sheets: {e}")
