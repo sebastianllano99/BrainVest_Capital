@@ -1,21 +1,21 @@
 import streamlit as st
 import os
 import sqlite3
-import importlib.util, sys
-
-# =========================
-# Ajustar ruta base
-# =========================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(BASE_DIR)
-
-import utilidades as util
+import importlib.util
+import sys
 
 st.set_page_config(page_title="Simulación Bursátil", layout="wide")
 
-# =========================
-# BASE DE DATOS
-# =========================
+# ==== CARGAR UTILIDADES DINÁMICAMENTE ====
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+utilidades_path = os.path.join(BASE_DIR, "utilidades.py")
+
+spec = importlib.util.spec_from_file_location("util", utilidades_path)
+util = importlib.util.module_from_spec(spec)
+sys.modules["util"] = util
+spec.loader.exec_module(util)
+
+# ==== BASE DE DATOS ====
 conn = sqlite3.connect("jugadores.db")
 c = conn.cursor()
 c.execute('''
@@ -27,18 +27,14 @@ c.execute('''
 ''')
 conn.commit()
 
-# =========================
-# PERFILES (Contraseñas → Perfil)
-# =========================
+# ==== PERFILES ====
 passwords = {
     "4539": "Conservador", "6758": "Conservador",
     "8795": "Moderado", "7906": "Moderado",
     "1357": "Arriesgado", "8745": "Arriesgado"
 }
 
-# =========================
-# LOGIN
-# =========================
+# ==== LOGIN ====
 def login_screen():
     st.title("Ingreso a la Simulación")
     username = st.text_input("Nombre del grupo")
@@ -60,20 +56,16 @@ def login_screen():
         else:
             st.error("Contraseña incorrecta")
 
-# =========================
-# ESTADO DE SESIÓN
-# =========================
+# ==== ESTADO DE SESIÓN ====
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "home"
 
-# Aplicar estilos globales
+# ==== APLICAR ESTILOS ====
 util.aplicar_estilos(hide_streamlit_nav=True)
 
-# =========================
-# FLUJO PRINCIPAL
-# =========================
+# ==== FLUJO PRINCIPAL ====
 if not st.session_state["logged_in"]:
     login_screen()
 else:
@@ -104,7 +96,7 @@ else:
             "pagina_a": "1_Pagina_A.py",
             "pagina_b": "2_Pagina_B.py",
             "pagina_c": "3_Pagina_C.py",
-            "pagina_d": "4_Pagina_D.py"  # nueva página
+            "pagina_d": "4_Pagina_D.py"  
         }
 
         page_file = mapping.get(st.session_state["current_page"])
