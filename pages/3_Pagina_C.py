@@ -4,6 +4,62 @@ import numpy as np
 import os
 import zipfile
 import gdown
+from pydrive2.auth import GoogleAuth
+from pydrive2.drive import GoogleDrive
+
+# -----------------------
+# Configuración
+# -----------------------
+CAPITAL_INICIAL = 200_000_000
+ZIP_URL = "https://drive.google.com/uc?id=1sgshq-1MLrO1oToV8uu-iM4SPnvgT149"
+ZIP_NAME = "acciones_2024.zip"
+CARPETA_DATOS = "Acciones_2024"
+
+# Aquí colocas el ID de la carpeta que me enviaste
+CARPETA_RESULTADOS_ID = "1okVq5b56rxJeOBHlxNr84ULX1xHf7tdD"  
+CCV_NAME = "CCV_resultados.csv"
+
+# -----------------------
+# Funciones para Drive
+# -----------------------
+@st.cache_resource
+def autenticar_drive():
+    gauth = GoogleAuth()
+    gauth.LocalWebserverAuth()  # Esto abrirá una ventana para autenticar la primera vez
+    return GoogleDrive(gauth)
+
+def buscar_archivo(drive, nombre, carpeta_id):
+    """Devuelve el archivo existente en la carpeta de Drive si existe."""
+    query = f"'{carpeta_id}' in parents and trashed=false and title='{nombre}'"
+    archivos = drive.ListFile({'q': query}).GetList()
+    return archivos[0] if archivos else None
+
+def subir_resultados_a_drive(resultados, drive, carpeta_id, nombre_archivo):
+    """Sube los resultados al archivo maestro en Drive, creándolo si es necesario, o anexando la fila nueva."""
+    archivo = buscar_archivo(drive, nombre_archivo, carpeta_id)
+    if archivo:
+        # Descargar versión actual
+        archivo.GetContentFile("temp_ccv.csv")
+        ccv = pd.read_csv("temp_ccv.csv")
+        # Verificar que no haya ya una fila con el mismo grupo (opcional)
+        # Aquí se añade la nueva fila
+        ccv = pd.concat([ccv, resultados], ignore_index=True)
+    else:
+        ccv = resultados
+
+    # Guardar el CSV actualizado localmente
+    ccv.to_csv("temp_ccv.csv", index=False)
+
+    if archivo:
+        archivo.SetContentFile("temp_ccv.csv")
+        archivo.Upload()
+    else:
+        nuevo = drive.CreateFile({
+            "title": nombre_archivo,
+            "parents": [{"id": carpeta_id}]
+        })
+        nuevo.SetContentFile("temp_ccv.csv")
+        nuevo.Upload()
 
 # -----------------------
 # Interfaz
@@ -29,7 +85,8 @@ st.download_button(
 # Subida CSV usuario
 uploaded = st.file_uploader("📂 Sube tu CSV (Ticker, % del Portafolio)", type=["csv"])
 df_user = None
-CAPITAL_INICIAL = 200_000_000  # Ejemplo 200 millones
+
+nombre_grupo = st.text_input("✍️ Ingresa el nombre de tu grupo")
 
 if uploaded:
     try:
@@ -40,19 +97,13 @@ if uploaded:
         st.error(f"❌ Error leyendo tu CSV: {e}")
 
 # -----------------------
-# Botón iniciar simulación
+# Botón para finalizar simulación y enviar resultados
 # -----------------------
-if st.button("🚀 Iniciar Simulación") and df_user is not None:
+if st.button("🚀 Finalizar Simulación") and df_user is not None and nombre_grupo.strip() != "":
 
     st.info("Simulación en ejecución...")
 
-    # -----------------------
-    # Paso 1: Descargar y extraer ZIP de Drive
-    # -----------------------
-    ZIP_URL = "https://drive.google.com/uc?id=1sgshq-1MLrO1oToV8uu-iM4SPnvgT149"
-    ZIP_NAME = "acciones_2024.zip"
-    CARPETA_DATOS = "Acciones_2024"
-
+    # Paso 1: Descargar ZIP de acciones si no existe
     if not os.path.exists(ZIP_NAME):
         gdown.download(ZIP_URL, ZIP_NAME, quiet=False)
 
@@ -60,9 +111,7 @@ if st.button("🚀 Iniciar Simulación") and df_user is not None:
         with zipfile.ZipFile(ZIP_NAME, 'r') as zip_ref:
             zip_ref.extractall(".")
 
-    # -----------------------
     # Paso 2: Leer precios de los tickers del usuario
-    # -----------------------
     precios = {}
     primer_dia_precios = {}
     tickers_validos = []
@@ -72,8 +121,8 @@ if st.button("🚀 Iniciar Simulación") and df_user is not None:
         if os.path.exists(file_path):
             df_ticker = pd.read_csv(file_path, parse_dates=['Date']).sort_values('Date')
             df_ticker = df_ticker.set_index('Date')
-            precios[ticker] = df_ticker['Close']  # Precios diarios para portafolio
-            primer_dia_precios[ticker] = df_ticker['Open'].iloc[0]  # Open primer día
+            precios[ticker] = df_ticker['Close']
+            primer_dia_precios[ticker] = df_ticker['Open'].iloc[0]
             tickers_validos.append(ticker)
         else:
             st.warning(f"⚠️ No se encontró archivo para {ticker}, se ignorará.")
@@ -81,68 +130,39 @@ if st.button("🚀 Iniciar Simulación") and df_user is not None:
     if not precios:
         st.error("❌ No hay tickers válidos para simular.")
     else:
-        # DataFrame de precios alineado con tickers válidos
         df_precios = pd.DataFrame(precios)
         df_user = df_user[df_user['Ticker'].isin(tickers_validos)].reset_index(drop=True)
 
-        # -----------------------
-        # Paso 3: Calcular monto invertido y cantidad de acciones
-        # -----------------------
         df_user['Monto Invertido'] = (df_user["% del Portafolio"] / 100) * CAPITAL_INICIAL
         df_user['Cantidad Acciones'] = df_user.apply(
             lambda row: row['Monto Invertido'] / primer_dia_precios[row['Ticker']], axis=1
         )
 
-        # -----------------------
-        # Paso 4: Calcular valor diario del portafolio
-        # -----------------------
         valores_diarios = df_precios * df_user['Cantidad Acciones'].values
         df_portafolio = valores_diarios.sum(axis=1)
 
-        # -----------------------
-        # Paso 5: Calcular métricas
-        # -----------------------
         retornos_diarios = df_portafolio.pct_change().fillna(0)
-        rentabilidad_acumulada = df_portafolio.iloc[-1] / df_portafolio.iloc[0] - 1
-        rentabilidad_anualizada = (1 + retornos_diarios.mean())**252 - 1
-        riesgo_anualizado = retornos_diarios.std() * np.sqrt(252)
-        sharpe_ratio = rentabilidad_anualizada / riesgo_anualizado
+        rent_anual = (1 + retornos_diarios.mean())**252 - 1
+        riesgo_anual = retornos_diarios.std() * np.sqrt(252)
+        sharpe = rent_anual / riesgo_anual if riesgo_anual > 0 else 0
 
         dias_arriba = (df_portafolio > CAPITAL_INICIAL).sum()
         dias_abajo = (df_portafolio <= CAPITAL_INICIAL).sum()
 
-        # -----------------------
-        # Paso 6: Mostrar resultados
-        # -----------------------
-        st.subheader("📈 Resultados del Portafolio")
-        st.write(f"Rentabilidad anualizada: {rentabilidad_anualizada:.2%}")
-        st.write(f"Riesgo (volatilidad anualizada): {riesgo_anualizado:.2%}")
-        st.write(f"Sharpe Ratio: {sharpe_ratio:.2f}")
-        st.write(f"Días por encima del capital inicial: {dias_arriba}")
-        st.write(f"Días por debajo del capital inicial: {dias_abajo}")
-
-        # -----------------------
-        # Paso 7: Guardar resultados en CSV
-        # -----------------------
         resultados = pd.DataFrame({
-            "Grupo": ["Nombre_Grupo"],  # Aquí podrías usar el nombre de la sesión
-            "Rentabilidad Anualizada": [rentabilidad_anualizada],
-            "Riesgo": [riesgo_anualizado],
-            "Sharpe": [sharpe_ratio],
+            "Grupo": [nombre_grupo],
+            "Rentabilidad Anualizada": [rent_anual],
+            "Riesgo": [riesgo_anual],
+            "Sharpe": [sharpe],
             "Días Arriba": [dias_arriba],
             "Días Abajo": [dias_abajo]
         })
-        st.download_button(
-            "💾 Descargar resultados CSV",
-            resultados.to_csv(index=False),
-            file_name="resultados_portafolio.csv"
-        )
 
-        # -----------------------
-        # Paso 8: Medallas (ejemplo estático)
-        # -----------------------
-        st.subheader("🏅 Medallas y Reconocimientos")
-        st.write("🥇 Mejor Sharpe Ratio: Grupo Alfa")
-        st.write("🥇 Mayor Rentabilidad: Grupo Gama")
-        st.write("🥇 Menor Riesgo: Grupo Delta")
-        st.write("🥈 Buen equilibrio: Grupo Beta")
+        st.subheader("📈 Resultados del Portafolio")
+        st.dataframe(resultados)
+
+        # Autenticación con Drive
+        drive = autenticar_drive()
+        subir_resultados_a_drive(resultados, drive, CARPETA_RESULTADOS_ID, CCV_NAME)
+
+        st.success("✅ Resultados enviados al archivo global en Drive")
