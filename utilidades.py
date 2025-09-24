@@ -49,7 +49,8 @@ def generarMenu_horizontal():
         unsafe_allow_html=True
     )
 
-    cols = st.columns(4)
+     cols = st.columns(5)  # de 4 → 5
+
     with cols[0]:
         if st.button("Inicio"):
             st.session_state["current_page"] = "home"
@@ -62,3 +63,8 @@ def generarMenu_horizontal():
     with cols[3]:
         if st.button("Mi portafolio"):
             st.session_state["current_page"] = "pagina_c"
+    with cols[4]:
+        if st.button("Nueva Página"):
+            st.session_state["current_page"] = "pagina_d"
+
+
