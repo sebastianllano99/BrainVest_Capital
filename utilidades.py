@@ -1,9 +1,13 @@
+# ================================
+# utilidades.py
+# ================================
 import streamlit as st
 
 def aplicar_estilos(hide_streamlit_nav=True):
     """
-    Aplica estilos globales. Si hide_streamlit_nav=True, oculta el navegador
-    automático de páginas que Streamlit genera (sidebar / toolbar).
+    Aplica estilos globales. 
+    Si hide_streamlit_nav=True, oculta el navegador automático de páginas 
+    que Streamlit genera (sidebar / toolbar).
     """
     css = """
     <style>
@@ -25,6 +29,10 @@ def aplicar_estilos(hide_streamlit_nav=True):
 
 
 def generarMenu_horizontal():
+    """
+    Genera un menú horizontal con botones que cambian la variable de sesión
+    'current_page' en Streamlit.
+    """
     st.markdown(
         """
         <style>
@@ -49,7 +57,8 @@ def generarMenu_horizontal():
         unsafe_allow_html=True
     )
 
-     cols = st.columns(5)  # de 4 → 5
+    # Menú de 5 botones
+    cols = st.columns(5)
 
     with cols[0]:
         if st.button("Inicio"):
@@ -66,5 +75,3 @@ def generarMenu_horizontal():
     with cols[4]:
         if st.button("Nueva Página"):
             st.session_state["current_page"] = "pagina_d"
-
-
