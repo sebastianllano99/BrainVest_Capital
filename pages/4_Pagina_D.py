@@ -50,7 +50,7 @@ if archivo is not None:
                 "PerdidaPromAbajo","GananciaTotal"]
     
     if all(col in df.columns for col in columnas):
-        st.success("Archivo válido ✅")
+        st.success("Archivo válido ")
         st.dataframe(df)
 
         if st.button(" Subir"):
@@ -71,10 +71,10 @@ if archivo is not None:
                         ganancia_total=excluded.ganancia_total
                 ''', tuple(row))
             conn.commit()
-            st.success("Resultados guardados correctamente ✅")
+            st.success("Resultados guardados correctamente ")
 
     else:
-        st.error("❌ El CSV no tiene las columnas esperadas.")
+        st.error(" El CSV no tiene las columnas esperadas.")
 
 # Botón refrescar
 if st.button(" Actualizar"):
@@ -86,11 +86,11 @@ if st.button(" Actualizar"):
         ])
         st.dataframe(df_total)
 
-        st.subheader("🏆 Top 3 por Sharpe Ratio")
+        st.subheader(" Top 3 por Sharpe Ratio")
         top3 = df_total.sort_values("Sharpe", ascending=False).head(3)
         st.table(top3)
 
-        st.subheader("✨ Menciones Especiales")
+        st.subheader(" Menciones Especiales")
 
         mas_rentable = df_total.loc[df_total["Ganancia Total"].idxmax()]
         st.write(f" **Más rentable:** {mas_rentable['Grupo']} con {mas_rentable['Ganancia Total']:.2f}")
