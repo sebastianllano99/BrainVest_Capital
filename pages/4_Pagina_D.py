@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Simulación de Resultados", layout="wide")
+
 
 st.title("Resultados de la Simulación")
 st.write("Cada grupo puede subir sus resultados aquí y verlos. "
