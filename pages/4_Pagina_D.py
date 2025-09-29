@@ -1,24 +1,20 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-import os
 
 st.title("Resultados de la Simulación")
 st.write(
     "Cada grupo puede subir sus resultados aquí y verlos en el tablero compartido. "
-    "⚠️ Los datos se eliminarán cuando el administrador borre o reinicie la app."
+    "⚠️ Los datos se eliminarán cuando el administrador use la opción de borrar."
 )
 
 # -----------------------------
 # Configuración base de datos
 # -----------------------------
 DB_FILE = "resultados.db"
-
-# Crear conexión
 conn = sqlite3.connect(DB_FILE, check_same_thread=False)
 c = conn.cursor()
 
-# Crear tabla si no existe
 c.execute("""
 CREATE TABLE IF NOT EXISTS resultados (
     Grupo TEXT,
@@ -59,6 +55,12 @@ if archivo is not None:
         st.error("❌ El CSV no tiene las columnas esperadas.")
 
 # -----------------------------
+# Botón para actualizar
+# -----------------------------
+if st.button("🔄 Actualizar tablero"):
+    st.experimental_rerun()
+
+# -----------------------------
 # Mostrar resultados acumulados
 # -----------------------------
 df_total = pd.read_sql("SELECT * FROM resultados", conn)
@@ -84,9 +86,16 @@ else:
     st.info("Aún no se han cargado resultados.")
 
 # -----------------------------
-# Botón para limpiar todo (solo admin)
+# Borrar con contraseña
 # -----------------------------
-if st.button("🗑️ Borrar todos los resultados"):
-    c.execute("DELETE FROM resultados")
-    conn.commit()
-    st.warning("Todos los resultados han sido eliminados.")
+st.subheader("🗑️ Administración")
+
+password = st.text_input("Ingrese contraseña para borrar todos los resultados", type="password")
+
+if st.button("Borrar todo"):
+    if password == "4539":
+        c.execute("DELETE FROM resultados")
+        conn.commit()
+        st.warning("✅ Todos los resultados han sido eliminados.")
+    else:
+        st.error("❌ Contraseña incorrecta. No se borraron los datos.")
