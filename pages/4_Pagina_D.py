@@ -4,29 +4,30 @@ import sqlite3
 
 st.title("Resultados de la Simulación")
 st.write("Cada grupo puede subir sus resultados aquí y verlos en conjunto. "
-         "✅ Los datos se guardan en una base compartida.")
+         "⚠️ Los datos se borrarán automáticamente al cerrar la app.")
 
 # -----------------------------
-# Conexión a SQLite
+# Conexión a SQLite en memoria (no guarda archivo)
 # -----------------------------
-conn = sqlite3.connect("resultados.db", check_same_thread=False)
-c = conn.cursor()
+if "conn" not in st.session_state:
+    st.session_state.conn = sqlite3.connect(":memory:", check_same_thread=False)
+    c = st.session_state.conn.cursor()
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS resultados (
+        Grupo TEXT,
+        RentabilidadAnualizada REAL,
+        Riesgo REAL,
+        Sharpe REAL,
+        DiasArriba INTEGER,
+        DiasAbajo INTEGER,
+        GananciaPromArriba REAL,
+        PerdidaPromAbajo REAL,
+        GananciaTotal REAL
+    )
+    ''')
+    st.session_state.conn.commit()
 
-# Crear tabla si no existe
-c.execute('''
-CREATE TABLE IF NOT EXISTS resultados (
-    Grupo TEXT,
-    RentabilidadAnualizada REAL,
-    Riesgo REAL,
-    Sharpe REAL,
-    DiasArriba INTEGER,
-    DiasAbajo INTEGER,
-    GananciaPromArriba REAL,
-    PerdidaPromAbajo REAL,
-    GananciaTotal REAL
-)
-''')
-conn.commit()
+conn = st.session_state.conn
 
 # -----------------------------
 # Subida de CSV
@@ -48,7 +49,7 @@ if archivo is not None:
 
         if st.button("Subir a base compartida"):
             df.to_sql("resultados", conn, if_exists="append", index=False)
-            st.success("Resultados guardados en la base compartida.")
+            st.success("Resultados guardados temporalmente.")
     else:
         st.error("❌ El CSV no tiene las columnas esperadas.")
 
