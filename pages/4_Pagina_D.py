@@ -4,7 +4,7 @@ import sqlite3
 import uuid
 import datetime
 
-st.set_page_config(page_title="Resultados Compartidos", layout="wide")
+
 st.title("Resultados de la Simulación (compartidos)")
 st.write("Sube tu CSV y todos los usuarios verán los resultados en conjunto. Usa `Actualizar` para recargar nuevos envíos.")
 
