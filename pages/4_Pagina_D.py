@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 
-st.set_page_config(page_title="Resultados de la Simulación", layout="wide")
+#st.set_page_config(page_title="Resultados de la Simulación", layout="wide")
 
 st.title("📊 Resultados de la Simulación")
 st.write(
