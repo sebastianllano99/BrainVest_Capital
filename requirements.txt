@@ -9,6 +9,9 @@ gdown
 matplotlib
 openpyxl
 gspread
+datetime
+uuid
+
 
 
 
