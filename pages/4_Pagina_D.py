@@ -6,7 +6,7 @@ st.title("📊 Resultados de la Simulación")
 
 st.write(
     "Cada grupo puede subir sus resultados aquí y verlos en el tablero compartido. "
-    "⚠️ Los datos se eliminarán cuando el administrador use la opción de borrar."
+    "Los datos se eliminarán cuando el administrador use la opción de borrar."
 )
 
 # -----------------------------
@@ -35,7 +35,7 @@ conn.commit()
 # -----------------------------
 # Subida de CSV
 # -----------------------------
-archivo = st.file_uploader("📂 Sube tu archivo CSV con resultados", type=["csv"])
+archivo = st.file_uploader(" Sube tu archivo CSV con resultados", type=["csv"])
 
 columnas = [
     "Grupo","RentabilidadAnualizada","Riesgo","Sharpe",
@@ -47,19 +47,19 @@ if archivo is not None:
     df = pd.read_csv(archivo)
 
     if all(col in df.columns for col in columnas):
-        st.success("✅ Archivo válido")
+        st.success("Archivo válido")
         st.dataframe(df)
 
-        if st.button("⬆️ Subir al tablero"):
+        if st.button("Subir al tablero"):
             df[columnas].to_sql("resultados", conn, if_exists="append", index=False)
             st.success("Resultados agregados al tablero compartido.")
     else:
-        st.error("❌ El CSV no tiene las columnas esperadas.")
+        st.error(" El CSV no tiene las columnas esperadas.")
 
 # -----------------------------
 # Botón para actualizar
 # -----------------------------
-if st.button("🔄 Actualizar tablero"):
+if st.button(" Actualizar tablero"):
     st.rerun()
 
 # -----------------------------
@@ -68,10 +68,10 @@ if st.button("🔄 Actualizar tablero"):
 df_total = pd.read_sql("SELECT * FROM resultados", conn)
 
 if not df_total.empty:
-    st.subheader("📊 Resultados acumulados")
+    st.subheader("Resultados acumulados")
     st.dataframe(df_total)
 
-    st.subheader("🏆 Top 3 por Sharpe Ratio")
+    st.subheader("🏆T op 3 por Sharpe Ratio")
     top3 = df_total.sort_values("Sharpe", ascending=False).head(3)
     st.table(top3)
 
@@ -94,7 +94,7 @@ else:
 # -----------------------------
 # Borrar con contraseña
 # -----------------------------
-st.subheader("🗑️ Administración")
+st.subheader("Administración")
 
 password = st.text_input("Ingrese contraseña para borrar todos los resultados", type="password")
 
@@ -102,6 +102,6 @@ if st.button("Borrar todo"):
     if password == "4539":
         c.execute("DELETE FROM resultados")
         conn.commit()
-        st.warning("✅ Todos los resultados han sido eliminados.")
+        st.warning("Todos los resultados han sido eliminados.")
     else:
-        st.error("❌ Contraseña incorrecta. No se borraron los datos.")
+        st.error("Contraseña incorrecta. No se borraron los datos.")
