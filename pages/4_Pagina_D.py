@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 
-#st.set_page_config(page_title="Resultados de la Simulación", layout="wide")
+# st.set_page_config(page_title="Resultados de la Simulación", layout="wide")
 
 st.title("📊 Resultados de la Simulación")
 st.write(
@@ -42,9 +42,9 @@ if archivo is not None:
     df = pd.read_csv(archivo)
 
     columnas = [
-        "Grupo","RentabilidadAnualizada","Riesgo","Sharpe",
-        "DiasArriba","DiasAbajo","GananciaPromArriba",
-        "PerdidaPromAbajo","GananciaTotal","CapitalSobrante"
+        "Grupo", "RentabilidadAnualizada", "Riesgo", "Sharpe",
+        "DiasArriba", "DiasAbajo", "GananciaPromArriba",
+        "PerdidaPromAbajo", "GananciaTotal", "CapitalSobrante"
     ]
 
     if all(col in df.columns for col in columnas):
@@ -77,6 +77,7 @@ if not df_total.empty:
     st.table(top3)
 
     st.subheader("✨ Menciones Especiales")
+
     mas_rentable = df_total.loc[df_total["GananciaTotal"].idxmax()]
     st.write(f"**Más rentable:** {mas_rentable['Grupo']} con {mas_rentable['GananciaTotal']:.2f}")
 
@@ -85,6 +86,10 @@ if not df_total.empty:
 
     mas_consistente = df_total.loc[df_total["DiasArriba"].idxmax()]
     st.write(f"**Más consistente:** {mas_consistente['Grupo']} con {mas_consistente['DiasArriba']} días arriba")
+
+    menor_sobrante = df_total.loc[df_total["CapitalSobrante"].idxmin()]
+    st.write(f"**Menor capital sobrante:** {menor_sobrante['Grupo']} con {menor_sobrante['CapitalSobrante']:.2f}")
+
 else:
     st.info("Aún no se han cargado resultados.")
 
@@ -92,7 +97,6 @@ else:
 # Borrar con contraseña
 # -----------------------------
 st.subheader("🗑️ Administración")
-
 password = st.text_input("Ingrese contraseña para borrar todos los resultados", type="password")
 
 if st.button("Borrar todo"):
