@@ -27,7 +27,7 @@ def formato_numero(x, decimales=2):
 # -----------------------
 # Interfaz
 # -----------------------
-st.title("Simulación de Portafolio — Solo Acciones Enteras (sin fraccionadas)")
+st.title("Simulación de Portafolio")
 
 st.write("""
 Sube un CSV con columnas `Ticker` y `% del Portafolio`.  
@@ -199,3 +199,4 @@ if st.button("Finalizar Simulación") and uploaded is not None:
     )
 
     st.info("✅ Simulación completada. Por favor descarga los resultados para subirlos en la siguiente pestaña.")
+
