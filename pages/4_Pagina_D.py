@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS resultados (
     DiasAbajo INTEGER,
     GananciaPromArriba REAL,
     PerdidaPromAbajo REAL,
-    GananciaTotal REAL
+    GananciaTotal REAL,
+    CapitalSobrante REAL
 )
 """)
 conn.commit()
@@ -43,7 +44,7 @@ if archivo is not None:
     columnas = [
         "Grupo","RentabilidadAnualizada","Riesgo","Sharpe",
         "DiasArriba","DiasAbajo","GananciaPromArriba",
-        "PerdidaPromAbajo","GananciaTotal"
+        "PerdidaPromAbajo","GananciaTotal","CapitalSobrante"
     ]
 
     if all(col in df.columns for col in columnas):
