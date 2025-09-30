@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 
-# st.set_page_config(page_title="Resultados de la Simulación", layout="wide")
-
 st.title("📊 Resultados de la Simulación")
 st.write(
     "Cada grupo puede subir sus resultados aquí y verlos en el tablero compartido. "
@@ -33,6 +31,13 @@ CREATE TABLE IF NOT EXISTS resultados (
 """)
 conn.commit()
 
+# Lista fija de columnas esperadas
+columnas = [
+    "Grupo","RentabilidadAnualizada","Riesgo","Sharpe",
+    "DiasArriba","DiasAbajo","GananciaPromArriba",
+    "PerdidaPromAbajo","GananciaTotal","CapitalSobrante"
+]
+
 # -----------------------------
 # Subida de CSV
 # -----------------------------
@@ -41,18 +46,13 @@ archivo = st.file_uploader("📂 Sube tu archivo CSV con resultados", type=["csv
 if archivo is not None:
     df = pd.read_csv(archivo)
 
-    columnas = [
-        "Grupo", "RentabilidadAnualizada", "Riesgo", "Sharpe",
-        "DiasArriba", "DiasAbajo", "GananciaPromArriba",
-        "PerdidaPromAbajo", "GananciaTotal", "CapitalSobrante"
-    ]
-
     if all(col in df.columns for col in columnas):
         st.success("✅ Archivo válido")
         st.dataframe(df)
 
         if st.button("⬆️ Subir al tablero"):
-            df.to_sql("resultados", conn, if_exists="append", index=False)
+            # 🔑 Subir solo las columnas definidas en la tabla y en el orden correcto
+            df[columnas].to_sql("resultados", conn, if_exists="append", index=False)
             st.success("Resultados agregados al tablero compartido.")
     else:
         st.error("❌ El CSV no tiene las columnas esperadas.")
