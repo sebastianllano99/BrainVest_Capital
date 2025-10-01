@@ -87,7 +87,7 @@ if not df_total.empty:
 
     st.subheader("✨ Menciones Especiales")
     mas_rentable = df_total.loc[df_total["GananciaTotal"].idxmax()]
-    st.write(f"**Más rentable:** {mas_rentable['Grupo']} con {mas_rentable['GananciaTotal']:.2f}")
+    st.write(f"**Más rentable:** {mas_rentable['Grupo']} con {mas_rentable['GananciaTotal']:.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
     mas_seguro = df_total.loc[df_total["Riesgo"].idxmin()]
     st.write(f"**Más seguro:** {mas_seguro['Grupo']} con riesgo {mas_seguro['Riesgo']:.2f}")
