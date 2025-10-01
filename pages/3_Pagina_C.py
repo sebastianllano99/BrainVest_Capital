@@ -10,7 +10,7 @@ import math
 # -----------------------
 # Configuración
 # -----------------------
-CAPITAL_INICIAL = 200_000_000
+CAPITAL_INICIAL = 500_000_000
 ZIP_URL = "https://drive.google.com/uc?id=1sgshq-1MLrO1oToV8uu-iM4SPnvgT149"
 ZIP_NAME = "acciones_2024.zip"
 CARPETA_DATOS = "Acciones_2024"
@@ -207,3 +207,4 @@ if st.button("Finalizar Simulación") and uploaded is not None:
     )
 
     st.info("✅ Simulación completada. Por favor descarga los resultados para subirlos en la siguiente pestaña.")
+
