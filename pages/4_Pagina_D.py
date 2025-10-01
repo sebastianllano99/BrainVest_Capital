@@ -50,9 +50,19 @@ if archivo is not None:
         st.success("Archivo válido")
         st.dataframe(df)
 
-        if st.button("Subir al tablero"):
-            df[columnas].to_sql("resultados", conn, if_exists="append", index=False)
-            st.success("Resultados agregados al tablero compartido.")
+        grupo = df["Grupo"].iloc[0]  # Nombre del grupo del archivo
+
+        # Validar si ya existe registro para este grupo
+        c.execute("SELECT COUNT(*) FROM resultados WHERE Grupo = ?", (grupo,))
+        existe = c.fetchone()[0]
+
+        if existe > 0:
+            st.warning(f"⚠️ El grupo **{grupo}** ya subió un archivo. "
+                       f"Debe eliminarlo primero antes de subir uno nuevo.")
+        else:
+            if st.button("Subir al tablero"):
+                df[columnas].to_sql("resultados", conn, if_exists="append", index=False)
+                st.success("Resultados agregados al tablero compartido.")
     else:
         st.error(" El CSV no tiene las columnas esperadas.")
 
