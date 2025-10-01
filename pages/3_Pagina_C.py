@@ -15,6 +15,9 @@ ZIP_URL = "https://drive.google.com/uc?id=1sgshq-1MLrO1oToV8uu-iM4SPnvgT149"
 ZIP_NAME = "acciones_2024.zip"
 CARPETA_DATOS = "Acciones_2024"
 
+# Tasa libre de riesgo: TES cero cupón (Banco de la República, mayo 2025)
+TASA_RF_ANUAL = 0.0925  # 9,25% anual
+
 # -----------------------
 # Función de formato numérico (estilo europeo/latino)
 # -----------------------
@@ -161,7 +164,9 @@ if st.button("Finalizar Simulación") and uploaded is not None:
     retornos_diarios = valores_diarios['PortafolioTotal'].pct_change().fillna(0)
     rent_anual = (1 + retornos_diarios.mean())**252 - 1
     riesgo_anual = retornos_diarios.std() * np.sqrt(252)
-    sharpe = rent_anual / riesgo_anual if riesgo_anual > 0 else 0
+
+    # Sharpe ajustado: compara contra TES cero cupón 9,25% (tasa libre de riesgo en Colombia)
+    sharpe = (rent_anual - TASA_RF_ANUAL) / riesgo_anual if riesgo_anual > 0 else 0
 
     dias_arriba = (valores_diarios['PortafolioTotal'] > CAPITAL_INICIAL).sum()
     dias_abajo = (valores_diarios['PortafolioTotal'] <= CAPITAL_INICIAL).sum()
@@ -189,6 +194,9 @@ if st.button("Finalizar Simulación") and uploaded is not None:
     st.subheader("Resultados del Portafolio")
     st.dataframe(resultados_formateado)
 
+    st.caption(f"ℹ️ Nota: El Sharpe se calculó usando una tasa libre de riesgo de {TASA_RF_ANUAL*100:.2f}% anual, "
+               "correspondiente a la tasa cero cupón de TES publicada por el Banco de la República (mayo 2025).")
+
     # -----------------------
     # Descargar CSV resultados (en bruto, no formateado)
     # -----------------------
@@ -199,4 +207,3 @@ if st.button("Finalizar Simulación") and uploaded is not None:
     )
 
     st.info("✅ Simulación completada. Por favor descarga los resultados para subirlos en la siguiente pestaña.")
-
