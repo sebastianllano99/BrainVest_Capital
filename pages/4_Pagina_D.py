@@ -99,7 +99,7 @@ st.subheader("Administración")
 password = st.text_input("Ingrese contraseña para borrar todos los resultados", type="password")
 
 if st.button("Borrar todo"):
-    if password == "4539":
+    if password == "4825":
         c.execute("DELETE FROM resultados")
         conn.commit()
         st.warning("Todos los resultados han sido eliminados.")
