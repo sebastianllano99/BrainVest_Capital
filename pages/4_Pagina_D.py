@@ -77,17 +77,21 @@ if st.button(" Actualizar tablero"):
 # -----------------------------
 df_total = pd.read_sql("SELECT * FROM resultados", conn)
 
+# Función para formatear valores monetarios con separadores
+def formato_monetario(valor):
+    return "${:,.2f}".format(valor)
+
 if not df_total.empty:
     st.subheader("Resultados acumulados")
     st.dataframe(df_total)
 
-    st.subheader("🏆T op 3 por Sharpe Ratio")
+    st.subheader("🏆 Top 3 por Sharpe Ratio")
     top3 = df_total.sort_values("Sharpe", ascending=False).head(3)
     st.table(top3)
 
     st.subheader("✨ Menciones Especiales")
     mas_rentable = df_total.loc[df_total["GananciaTotal"].idxmax()]
-    st.write(f"**Más rentable:** {mas_rentable['Grupo']} con {mas_rentable['GananciaTotal']:.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    st.write(f"**Más rentable:** {mas_rentable['Grupo']} con {formato_monetario(mas_rentable['GananciaTotal'])}")
 
     mas_seguro = df_total.loc[df_total["Riesgo"].idxmin()]
     st.write(f"**Más seguro:** {mas_seguro['Grupo']} con riesgo {mas_seguro['Riesgo']:.2f}")
@@ -96,7 +100,7 @@ if not df_total.empty:
     st.write(f"**Más consistente:** {mas_consistente['Grupo']} con {mas_consistente['DiasArriba']} días arriba")
 
     menor_sobrante = df_total.loc[df_total["CapitalSobrante"].idxmin()]
-    st.write(f"**Menor capital sobrante:** {menor_sobrante['Grupo']} con {menor_sobrante['CapitalSobrante']:.2f}")
+    st.write(f"**Menor capital sobrante:** {menor_sobrante['Grupo']} con {formato_monetario(menor_sobrante['CapitalSobrante'])}")
 
 else:
     st.info("Aún no se han cargado resultados.")
@@ -106,7 +110,8 @@ else:
 # -----------------------------
 st.subheader("Administración")
 
-password = st.text_input("Ingrese contraseña para borrar todos los resultados", type="password")
+# Contraseña completamente oculta
+password = st.text_input("Ingrese contraseña para borrar todos los resultados", type="password", help="La contraseña no será visible al escribirla.")
 
 if st.button("Borrar todo"):
     if password == "4825":
